@@ -1,0 +1,254 @@
+-- [[ ULTI COOKIE - PRESETS & SIDEBAR LAUNCHER ]] --
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local HubName = "ULTI COOKIE LAUNCHER"
+local TweenService = game:GetService("TweenService")
+
+-- ==========================================
+-- GAMES CONFIGURATION (MANUELL BEARBEITEN)
+-- ==========================================
+local GamesTable = {
+    {
+        Name = "Universal Main Script", 
+        Status = "gruen", 
+        Desc = "Das All-in-One Skript für alle Spiele.\nBeinhaltet: Player Tweaks, Visuals, Server Hop und Performance Booster.",
+        Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/f9e3a07a50b55503b04bf37b9587779881b438ab/UNIVERSAL"
+    },
+
+}
+
+local StatusColors = {
+    gruen = Color3.fromRGB(0, 255, 120),
+    gelb  = Color3.fromRGB(255, 200, 0),
+    rot   = Color3.fromRGB(255, 70, 70)
+}
+
+-- ==========================================
+-- GUI SETUP
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then ScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") end
+ScreenGui.Name = "UltiCookie_SidebarSelector"
+ScreenGui.ResetOnSpawn = false
+
+-- Hauptfenster
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+MainFrame.Position = UDim2.new(0.5, -185, 0.5, -210)
+MainFrame.Size = UDim2.new(0, 370, 0, 420)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Color = Color3.fromRGB(35, 35, 40)
+Stroke.Thickness = 1.5
+
+-- Neon Linie oben
+local TopLine = Instance.new("Frame", MainFrame)
+TopLine.Size = UDim2.new(1, 0, 0, 3)
+TopLine.BackgroundColor3 = Color3.fromRGB(0, 255, 120)
+Instance.new("UICorner", TopLine).CornerRadius = UDim.new(0, 12)
+
+-- Linker Bereich: Spieleliste
+local LeftPanel = Instance.new("Frame", MainFrame)
+LeftPanel.Size = UDim2.new(0, 370, 1, 0)
+LeftPanel.Position = UDim2.new(0, 0, 0, 0)
+LeftPanel.BackgroundTransparency = 1
+
+local Title = Instance.new("TextLabel", LeftPanel)
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Position = UDim2.new(0, 0, 0, 3)
+Title.BackgroundTransparency = 1
+Title.Text = HubName
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+
+local SubTitle = Instance.new("TextLabel", LeftPanel)
+SubTitle.Size = UDim2.new(1, 0, 0, 20)
+SubTitle.Position = UDim2.new(0, 0, 0, 38)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "Wähle ein Spiel für Details:"
+SubTitle.TextColor3 = Color3.fromRGB(140, 140, 145)
+SubTitle.Font = Enum.Font.GothamMedium
+SubTitle.TextSize = 12
+
+local ScrollFrame = Instance.new("ScrollingFrame", LeftPanel)
+ScrollFrame.Size = UDim2.new(1, -24, 1, -95)
+ScrollFrame.Position = UDim2.new(0, 12, 0, 75)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local UIListLayout = Instance.new("UIListLayout", ScrollFrame)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 5)
+end)
+
+-- ==========================================
+-- RECHTER BEREICH: INFO SIDEBAR (DETAILS)
+-- ==========================================
+local RightPanel = Instance.new("Frame", MainFrame)
+RightPanel.Size = UDim2.new(0, 230, 1, 0)
+RightPanel.Position = UDim2.new(0, 370, 0, 0) -- Genau rechts neben dem LeftPanel
+RightPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+
+-- Trennlinie zwischen den Panels
+local Separator = Instance.new("Frame", RightPanel)
+Separator.Size = UDim2.new(0, 1, 1, 0)
+Separator.Position = UDim2.new(0, 0, 0, 0)
+Separator.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+
+-- Live Game Name in Sidebar
+local SideTitle = Instance.new("TextLabel", RightPanel)
+SideTitle.Size = UDim2.new(0, 200, 0, 50)
+SideTitle.Position = UDim2.new(0, 15, 0, 10)
+SideTitle.BackgroundTransparency = 1
+SideTitle.Text = "Spiel Name"
+SideTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SideTitle.Font = Enum.Font.GothamBold
+SideTitle.TextSize = 15
+SideTitle.TextXAlignment = Enum.TextXAlignment.Left
+SideTitle.TextWrapped = true
+
+-- Live Beschreibung
+local SideDesc = Instance.new("TextLabel", RightPanel)
+SideDesc.Size = UDim2.new(0, 200, 0, 180)
+SideDesc.Position = UDim2.new(0, 15, 0, 65)
+SideDesc.BackgroundTransparency = 1
+SideDesc.Text = "Beschreibung..."
+SideDesc.TextColor3 = Color3.fromRGB(160, 160, 165)
+SideDesc.Font = Enum.Font.Gotham
+SideDesc.TextSize = 12
+SideDesc.TextXAlignment = Enum.TextXAlignment.Left
+SideDesc.TextYAlignment = Enum.TextYAlignment.Top
+SideDesc.TextWrapped = true
+
+-- KNOPF 1: SKRIPT LADEN (Position korrigiert auf X=15)
+local LoadBtn = Instance.new("TextButton", RightPanel)
+LoadBtn.Size = UDim2.new(0, 200, 0, 38)
+LoadBtn.Position = UDim2.new(0, 15, 1, -100)
+LoadBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120)
+LoadBtn.Text = "SKRIPT LADEN"
+LoadBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+LoadBtn.Font = Enum.Font.GothamBold
+LoadBtn.TextSize = 13
+Instance.new("UICorner", LoadBtn).CornerRadius = UDim.new(0, 6)
+
+-- KNOPF 2: REPORT BROKEN (Position korrigiert auf X=15)
+local ReportBtn = Instance.new("TextButton", RightPanel)
+ReportBtn.Size = UDim2.new(0, 200, 0, 34)
+ReportBtn.Position = UDim2.new(0, 15, 1, -50)
+ReportBtn.BackgroundColor3 = Color3.fromRGB(30, 20, 22)
+ReportBtn.Text = "Report Broken ⚠️"
+ReportBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+ReportBtn.Font = Enum.Font.GothamMedium
+ReportBtn.TextSize = 12
+Instance.new("UICorner", ReportBtn).CornerRadius = UDim.new(0, 6)
+local ReportStroke = Instance.new("UIStroke", ReportBtn)
+ReportStroke.Color = Color3.fromRGB(100, 40, 45)
+
+local CurrentSelectedScript = nil
+
+-- ==========================================
+-- LAUNCHER CONTROLLER ENGINE
+-- ==========================================
+for _, gameData in pairs(GamesTable) do
+    local GameBtn = Instance.new("TextButton", ScrollFrame)
+    GameBtn.Size = UDim2.new(1, -6, 0, 44)
+    GameBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+    GameBtn.Text = "" 
+    GameBtn.AutoButtonColor = false
+    Instance.new("UICorner", GameBtn).CornerRadius = UDim.new(0, 8)
+    
+    local ButtonStroke = Instance.new("UIStroke", GameBtn)
+    ButtonStroke.Color = Color3.fromRGB(30, 30, 35)
+    ButtonStroke.Thickness = 1
+    
+    local StatusDot = Instance.new("Frame", GameBtn)
+    StatusDot.Size = UDim2.new(0, 10, 0, 10)
+    StatusDot.Position = UDim2.new(0, 14, 0.5, -5)
+    StatusDot.BackgroundColor3 = StatusColors[gameData.Status] or Color3.fromRGB(200, 200, 200)
+    Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1, 0)
+
+    local BtnText = Instance.new("TextLabel", GameBtn)
+    BtnText.Size = UDim2.new(1, -45, 1, 0)
+    BtnText.Position = UDim2.new(0, 35, 0, 0)
+    BtnText.BackgroundTransparency = 1
+    BtnText.Text = gameData.Name
+    BtnText.TextColor3 = gameData.Status == "rot" and Color3.fromRGB(100, 100, 105) or Color3.fromRGB(220, 220, 225)
+    BtnText.Font = Enum.Font.GothamMedium
+    BtnText.TextSize = 13
+    BtnText.TextXAlignment = Enum.TextXAlignment.Left
+
+    GameBtn.MouseEnter:Connect(function()
+        if gameData.Status ~= "rot" then
+            ButtonStroke.Color = Color3.fromRGB(60, 60, 70)
+            GameBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+        else
+            ButtonStroke.Color = Color3.fromRGB(120, 40, 40)
+        end
+    end)
+    
+    GameBtn.MouseLeave:Connect(function()
+        ButtonStroke.Color = Color3.fromRGB(30, 30, 35)
+        if gameData.Status ~= "rot" then GameBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 24) end
+    end)
+    
+    GameBtn.MouseButton1Click:Connect(function()
+        if gameData.Status == "rot" then
+            local oldText = BtnText.Text
+            BtnText.Text = "OFFLINE / PATCHING"
+            BtnText.TextColor3 = Color3.fromRGB(255, 70, 70)
+            task.wait(1.2)
+            BtnText.Text = oldText
+            BtnText.TextColor3 = Color3.fromRGB(100, 100, 105)
+        else
+            CurrentSelectedScript = gameData.Link
+            SideTitle.Text = gameData.Name
+            SideDesc.Text = gameData.Desc
+            
+            TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 600, 0, 420)
+            }):Play()
+        end
+    end)
+end
+
+-- ==========================================
+-- SIDEBAR BUTTONS ACTIONS
+-- ==========================================
+LoadBtn.MouseButton1Click:Connect(function()
+    if CurrentSelectedScript then
+        LoadBtn.Text = "INJECTING..."
+        LoadBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 90)
+        task.wait(0.3)
+        
+        ScreenGui:Destroy()
+        
+        pcall(function()
+            loadstring(game:HttpGet(CurrentSelectedScript))()
+        end)
+    end
+end)
+
+ReportBtn.MouseButton1Click:Connect(function()
+    ReportBtn.Text = "Gemeldet! Danke ✔️"
+    ReportBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    ReportBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    
+    if setclipboard then
+        setclipboard("Bug Report für: " .. tostring(SideTitle.Text))
+    end
+    
+    task.wait(2)
+    ReportBtn.Text = "Report Broken ⚠️"
+    ReportBtn.BackgroundColor3 = Color3.fromRGB(30, 20, 22)
+    ReportBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+end)
