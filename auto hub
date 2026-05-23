@@ -1,0 +1,236 @@
+-- [[ ULTI COOKIE - AUTOMATIC AUTO-DETECTOR HUB ]] --
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local lPlayer = Players.LocalPlayer
+
+-- ==========================================
+-- GAMES DATABASE
+-- ==========================================
+local GamesDatabase = {
+    [606849621] = { 
+        Name = "Jailbreak Script",
+        Status = "gruen",
+        Link = "https://raw.githubusercontent.com/DEIN_GITHUB/jailbreak.lua"
+    },
+    [2753915549] = { 
+        Name = "Blox Fruits Premium",
+        Status = "gelb",
+        Link = "https://raw.githubusercontent.com/DEIN_GITHUB/bloxfruits.lua"
+    },
+}
+
+-- Universal-Skript Fallback
+local UniversalScript = {
+    Name = "Universal Cookie Main",
+    Status = "gruen",
+    Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/f9e3a07a50b55503b04bf37b9587779881b438ab/UNIVERSAL"
+}
+
+-- Aktuelles Spiel erkennen
+local currentPlaceId = game.PlaceId
+local DetectedGame = GamesDatabase[currentPlaceId] or UniversalScript
+
+if DetectedGame.Status == "rot" then
+    print("Ulti Cookie: Dieses Skript ist momentan offline.")
+    return
+end
+
+-- ==========================================
+-- INTERFACE SETUP
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not ScreenGui.Parent then ScreenGui.Parent = lPlayer:WaitForChild("PlayerGui") end
+ScreenGui.Name = "UltiCookie_AutoDetector"
+ScreenGui.ResetOnSpawn = false
+
+-- Blur-Effekt
+local BlurEffect = Instance.new("BlurEffect", Lighting)
+BlurEffect.Size = 0
+BlurEffect.Name = "UltiCookie_Blur"
+TweenService:Create(BlurEffect, TweenInfo.new(0.6), {Size = 20}):Play()
+
+-- Hauptfenster
+local DecisionFrame = Instance.new("Frame", ScreenGui)
+DecisionFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+DecisionFrame.Size = UDim2.new(0, 340, 0, 230)
+DecisionFrame.Position = UDim2.new(0.5, -170, 0.5, -115)
+DecisionFrame.Active = true
+DecisionFrame.Draggable = true
+Instance.new("UICorner", DecisionFrame).CornerRadius = UDim.new(0, 10)
+
+local MainStroke = Instance.new("UIStroke", DecisionFrame)
+MainStroke.Color = Color3.fromRGB(0, 255, 120)
+MainStroke.Thickness = 1.5
+
+-- Titel
+local Title = Instance.new("TextLabel", DecisionFrame)
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundTransparency = 1
+Title.Text = "DETECTED: " .. DetectedGame.Name:upper()
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+
+local SubTitle = Instance.new("TextLabel", DecisionFrame)
+SubTitle.Size = UDim2.new(1, 0, 0, 20)
+SubTitle.Position = UDim2.new(0, 0, 0, 35)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "Wähle deine Lade-Methode aus:"
+SubTitle.TextColor3 = Color3.fromRGB(140, 140, 145)
+SubTitle.Font = Enum.Font.GothamMedium
+SubTitle.TextSize = 11
+
+-- BUTTON 1: SILENT LOAD
+local SilentBtn = Instance.new("TextButton", DecisionFrame)
+SilentBtn.Size = UDim2.new(0, 140, 0, 40)
+SilentBtn.Position = UDim2.new(0, 20, 0, 80)
+SilentBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+SilentBtn.Text = "Silent Load 🥷"
+SilentBtn.TextColor3 = Color3.fromRGB(170, 170, 180)
+SilentBtn.Font = Enum.Font.GothamMedium
+SilentBtn.TextSize = 13
+Instance.new("UICorner", SilentBtn).CornerRadius = UDim.new(0, 6)
+local SilentStroke = Instance.new("UIStroke", SilentBtn)
+SilentStroke.Color = Color3.fromRGB(35, 35, 40)
+
+-- BUTTON 2: NORMAL LOAD
+local NormalBtn = Instance.new("TextButton", DecisionFrame)
+NormalBtn.Size = UDim2.new(0, 140, 0, 40)
+NormalBtn.Position = UDim2.new(0, 180, 0, 80)
+NormalBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120)
+NormalBtn.Text = "Normal Load 🚀"
+NormalBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+NormalBtn.Font = Enum.Font.GothamBold
+NormalBtn.TextSize = 13
+Instance.new("UICorner", NormalBtn).CornerRadius = UDim.new(0, 6)
+
+-- BUTTON 3: FORCE UNIVERSAL LOAD
+local UniversalBtn = Instance.new("TextButton", DecisionFrame)
+UniversalBtn.Size = UDim2.new(1, -40, 0, 38)
+UniversalBtn.Position = UDim2.new(0, 20, 0, 140)
+UniversalBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+UniversalBtn.Text = "Load Universal Cookie Script 🌐"
+UniversalBtn.TextColor3 = Color3.fromRGB(220, 220, 225)
+UniversalBtn.Font = Enum.Font.GothamMedium
+UniversalBtn.TextSize = 12
+Instance.new("UICorner", UniversalBtn).CornerRadius = UDim.new(0, 6)
+local UniversalStroke = Instance.new("UIStroke", UniversalBtn)
+UniversalStroke.Color = Color3.fromRGB(45, 45, 50)
+
+-- Hover-Effekte
+SilentBtn.MouseEnter:Connect(function() SilentStroke.Color = Color3.fromRGB(100, 100, 110) end)
+SilentBtn.MouseLeave:Connect(function() SilentStroke.Color = Color3.fromRGB(35, 35, 40) end)
+NormalBtn.MouseEnter:Connect(function() NormalBtn.BackgroundColor3 = Color3.fromRGB(0, 220, 100) end)
+NormalBtn.MouseLeave:Connect(function() NormalBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120) end)
+UniversalBtn.MouseEnter:Connect(function() UniversalStroke.Color = Color3.fromRGB(0, 255, 120) end)
+UniversalBtn.MouseLeave:Connect(function() UniversalStroke.Color = Color3.fromRGB(45, 45, 50) end)
+
+-- ==========================================
+-- LOADING ENGINE (UNIVERSALER LADEBALKEN)
+-- ==========================================
+local function StartLoadingBar(targetScript, isSilentMode)
+    -- Alle Knöpfe ausblenden
+    SilentBtn.Visible = false
+    NormalBtn.Visible = false
+    UniversalBtn.Visible = false
+    SubTitle.Visible = false
+    
+    -- Fenster verkleinern für den Balken
+    TweenService:Create(DecisionFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 340, 0, 100)}):Play()
+    
+    if isSilentMode then
+        Title.Text = "BYPASSING ANTICHEAT & COLD-LOADING..."
+    else
+        Title.Text = "INITIALIZING COOKIE ENGINE..."
+    end
+    
+    -- Ladebalken Erstellung
+    local BarBackground = Instance.new("Frame", DecisionFrame)
+    BarBackground.Size = UDim2.new(1, -40, 0, 8)
+    BarBackground.Position = UDim2.new(0, 20, 0, 60)
+    BarBackground.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    Instance.new("UICorner", BarBackground).CornerRadius = UDim.new(0, 4)
+    
+    local LoadingBar = Instance.new("Frame", BarBackground)
+    LoadingBar.Size = UDim2.new(0, 0, 1, 0)
+    LoadingBar.BackgroundColor3 = isSilentMode and Color3.fromRGB(170, 170, 180) or Color3.fromRGB(0, 255, 120)
+    Instance.new("UICorner", LoadingBar).CornerRadius = UDim.new(0, 4)
+    
+    local PercentText = Instance.new("TextLabel", DecisionFrame)
+    PercentText.Size = UDim2.new(1, 0, 0, 20)
+    PercentText.Position = UDim2.new(0, 0, 0, 72)
+    PercentText.BackgroundTransparency = 1
+    PercentText.Text = "0%"
+    PercentText.TextColor3 = Color3.fromRGB(150, 150, 155)
+    PercentText.Font = Enum.Font.GothamMedium
+    PercentText.TextSize = 11
+
+    task.spawn(function()
+        -- Ladezeit bestimmen: Silent/Universal dauert 10 Sekunden, Normal dauert 5 Sekunden
+        local loadDuration = isSilentMode and 10 or 5
+        
+        TweenService:Create(LoadingBar, TweenInfo.new(loadDuration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+        
+        for i = 0, 100 do
+            PercentText.Text = tostring(i) .. "%"
+            
+            -- Simuliere realistische Hänger bei bestimmten Prozenten
+            if i == 32 or i == 84 then
+                task.wait(isSilentMode and 0.5 or 0.2)
+            else
+                task.wait(loadDuration / 105)
+            end
+        end
+        
+        PercentText.Text = "READY! UNLEASHING..."
+        PercentText.TextColor3 = Color3.fromRGB(0, 255, 120)
+        task.wait(0.5)
+        
+        -- Nach dem Laden aufräumen
+        if isSilentMode then
+            -- Silent-Modus löscht erst ALLES restlos vor dem Ausführen
+            ScreenGui.Enabled = false
+            BlurEffect:Destroy()
+            ScreenGui:Destroy()
+            if gcinfo then pcall(gcinfo) end
+            task.wait(math.random(3, 6) / 10)
+            
+            pcall(function()
+                loadstring(game:HttpGet(targetScript.Link))()
+            end)
+        else
+            -- Normaler Modus
+            local blurTween = TweenService:Create(BlurEffect, TweenInfo.new(0.4), {Size = 0})
+            blurTween:Play()
+            blurTween.Completed:Connect(function() BlurEffect:Destroy() end)
+            ScreenGui:Destroy()
+            
+            pcall(function()
+                loadstring(game:HttpGet(targetScript.Link))()
+            end)
+        end
+    end)
+end
+
+-- ==========================================
+-- BUTTON CLICKS
+-- ==========================================
+
+-- Klick auf Silent Load (Balken läuft 10s)
+SilentBtn.MouseButton1Click:Connect(function()
+    StartLoadingBar(DetectedGame, true)
+end)
+
+-- Klick auf Universal Load (Nutzt ebenfalls den 10s Silent-Schutz)
+UniversalBtn.MouseButton1Click:Connect(function()
+    StartLoadingBar(UniversalScript, true)
+end)
+
+-- Klick auf Normal Load (Balken läuft 5s)
+NormalBtn.MouseButton1Click:Connect(function()
+    StartLoadingBar(DetectedGame, false)
+end)
