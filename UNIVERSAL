@@ -3,2034 +3,2551 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/d
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "universal cookie script 1.0.0",
+    Title = "universal cookie script 2.0.0",
     SubTitle = "by ulti cookie",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = true, -- The blur may be detectable, setting this to false disables blur entirely
+    Acrylic = true, 
     Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl -- Used when theres no MinimizeKeybind
+    MinimizeKey = Enum.KeyCode.LeftControl 
 })
 
 local Tabs = {
     PLTAB   = Window:AddTab({ Title = "Player", Icon = "user" }),
+    Waypoints   = Window:AddTab({ Title = "waypoints", Icon = "waypoints" }),
     Combat  = Window:AddTab({ Title = "Combat", Icon = "swords" }),
     Visuals = Window:AddTab({ Title = "Visuals", Icon = "eye" }),
-    Misc    = Window:AddTab({ Title = "Misc", Icon = "sliders" }),
+    Dev = Window:AddTab({ Title = "dev tools", Icon = "code" }),
     Teleport = Window:AddTab({ Title = "Teleport", Icon = "map-pin" }), 
-    server    = Window:AddTab({ Title = "server", Icon = "globe" }), 
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }) 
+    Server    = Window:AddTab({ Title = "server", Icon = "server" }), 
+    Misc    = Window:AddTab({ Title = "Misc", Icon = "sliders" }),
+    Internet =Window:AddTab({ Title = "internet", Icon = "wifi" }),
 }
 
 
 
 
-local currentMode = "WalkSpeed"
-local speedValue = 16
-local antiResetEnabled = false
+local SpeedSection = Tabs.PLTAB:AddSection("Speed")
 
--- 1. DROPDOWN FÜR DIE MODI
-local ModeDropdown = Tabs.PLTAB:AddDropdown("SpeedMode", {
-    Title = "Speed Modus",
-    Values = {"WalkSpeed", "Velocity", "CFrame"},
-    Default = "WalkSpeed",
-    Callback = function(Value)
-        currentMode = Value
-        -- Falls wir den Modus wechseln, setzen wir die normale Geschwindigkeit kurz zurück
-        local player = game.Players.LocalPlayer
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = 16
-        end
-    end
-})
 
--- 2. DER SLIDER (Steuert nur noch die Variablen an)
-local SpeedSlider = Tabs.PLTAB:AddSlider("Slider", {
-    Title = "Player Speed",
-    Description = "Ändere deine Geschwindigkeit",
-    Default = 16,
-    Min = 5,
-    Max = 200,
-    Rounding = 0,
-    Callback = function(Value)
-        speedValue = Value
+-- ==========================================
+-- LOGIK-VARIABLEN (Ganz oben im Skript platzieren)               walkspeed
+-- ==========================================
+local speedEnabled = false
+local targetSpeed = 16
+local defaultSpeed = 16
+local velocityMode = false
+
+local player = game.Players.LocalPlayer
+local uis = game:GetService("UserInputService")
+
+-- Funktion zur Prüfung, ob Tasten gedrückt werden
+local function isMoving()
+    return uis:IsKeyDown(Enum.KeyCode.W) or uis:IsKeyDown(Enum.KeyCode.A) or 
+           uis:IsKeyDown(Enum.KeyCode.S) or uis:IsKeyDown(Enum.KeyCode.D)
+end
+
+-- Hintergrund-Schleife für Speed-Spam und Velocity-Stopp
+task.spawn(function()
+    while true do
+        task.wait()
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         
-        if not antiResetEnabled and currentMode == "WalkSpeed" then
-            local player = game.Players.LocalPlayer
-            if player.Character and player.Character:FindFirstChild("Humanoid") then
-                player.Character.Humanoid.WalkSpeed = Value
+        if humanoid and rootPart then
+            -- Speed-Spam
+            if speedEnabled then
+                if humanoid.WalkSpeed ~= targetSpeed and humanoid.WalkSpeed ~= defaultSpeed then
+                    defaultSpeed = humanoid.WalkSpeed -- Sichert den Originalwert des Spiels
+                end
+                humanoid.WalkSpeed = targetSpeed
             end
-        end
-    end
-})
--- 3. TOGGLE FOR ANTI-SPEED RESET (Die Hauptlogik)
-local ResetToggle = Tabs.PLTAB:AddToggle("AntiReset", {
-    Title = "Anti Speed Reset (velocitie/cframe need it)",
-    Default = false,
-    Callback = function(Value)
-        antiResetEnabled = Value
-    end
-})
-
-game:GetService("RunService").Heartbeat:Connect(function()
-    if not antiResetEnabled then return end
-    
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not (humanoid and rootPart) or humanoid.Health <= 0 then return end
-
-    -- Modus 1: Klassischer WalkSpeed Loop
-    if currentMode == "WalkSpeed" then
-        if humanoid.WalkSpeed ~= speedValue then
-            humanoid.WalkSpeed = speedValue
-        end
-
-    elseif currentMode == "Velocity" then
-        if humanoid.MoveDirection.Magnitude > 0 then
-            rootPart.AssemblyLinearVelocity = Vector3.new(
-                humanoid.MoveDirection.X * speedValue,
-                rootPart.AssemblyLinearVelocity.Y, 
-                humanoid.MoveDirection.Z * speedValue
-            )
-        end
-
-    elseif currentMode == "CFrame" then
-        if humanoid.MoveDirection.Magnitude > 0 then
-            rootPart.CFrame = rootPart.CFrame + (humanoid.MoveDirection * (speedValue / 60))
+            
+            -- Velocity Mode (Sofort-Stopp)
+            if velocityMode and not isMoving() then
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, rootPart.AssemblyLinearVelocity.Y, 0)
+            end
         end
     end
 end)
 
+-- ==========================================
+-- FLUENT UI ELEMENTS (Füge das in deinen Player-Tab ein)
+-- ==========================================
 
--- Variablen für den Jump-Zustand
-local currentJumpMode = "JumpPower"
-local jumpValue = 50 -- Standard Roblox JumpPower ist oft 50 (JumpHeight ist meist 7.2)
-local antiJumpResetEnabled = false
-
--- 1. JUMP MODUS DROPDOWN
-local JumpModeDropdown = Tabs.PLTAB:AddDropdown("JumpMode", {
-    Title = "Jump Modus",
-    Values = {"JumpPower", "JumpHeight", "Velocity", "CFrame"},
-    Default = "JumpPower",
+-- Toggle für die Aktivierung des Speed-Hacks
+local SpeedToggle = Tabs.PLTAB:AddToggle("SpeedToggle", {
+    Title = "Enable Custom Speed", 
+    Default = false,
     Callback = function(Value)
-        currentJumpMode = Value
+        speedEnabled = Value
+        
+        -- Beim Ausschalten sofort auf den alten Standardwert zurücksetzen
+        if not speedEnabled then
+            local character = player.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = defaultSpeed
+            end
+        end
+    end
+})
+
+-- Slider für die Geschwindigkeit
+local SpeedSlider = Tabs.PLTAB:AddSlider("SpeedSlider", {
+    Title = "Player Speed",
+    Description = "Ändert die Laufgeschwindigkeit",
+    Min = 16,
+    Max = 500,
+    Default = 16,
+    Rounding = 0,
+    Callback = function(Value)
+        targetSpeed = Value
+    end
+})
+
+-- Toggle für den Velocity-Mode (Sofort-Stopp)
+local VelocityToggle = Tabs.PLTAB:AddToggle("VelocityToggle", {
+    Title = "Velocity Mode",
+    Description = "Stoppt sofortiges Rutschen/Trägheit beim Loslassen",
+    Default = false,
+    Callback = function(Value)
+        velocityMode = Value
     end
 })
 
 
-local JumpSlider = Tabs.PLTAB:AddSlider("JumpSlider", {
-    Title = "Player Jump",
-    Description = "Ändere deine Sprungkraft / Höhe",
-    Default = 50,
-    Min = 0,
-    Max = 500,
-    Rounding = 0,
-    Callback = function(Value)
-        jumpValue = Value
+
+
+
+local JumpSection = Tabs.PLTAB:AddSection("Jump")
+
+
+
+-- ==========================================
+-- LOGIK-VARIABLEN (Ganz oben zu den anderen packen)
+-- ==========================================
+local jumpEnabled = false
+local targetJump = 50
+local defaultJump = 50
+local defaultUseJumpPower = true
+local jumpMode = "JumpPower" -- Standard-Modus
+
+local player = game.Players.LocalPlayer
+
+-- Hintergrund-Schleife für Jump-Spam
+task.spawn(function()
+    while true do
+        task.wait()
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
         
-        -- Direktes Anwenden, wenn Anti-Reset AUS ist
-        if not antiJumpResetEnabled then
-            local player = game.Players.LocalPlayer
-            if player.Character and player.Character:FindFirstChild("Humanoid") then
-                local humanoid = player.Character.Humanoid
-                if currentJumpMode == "JumpPower" then
-                    humanoid.JumpPower = Value
-                elseif currentJumpMode == "JumpHeight" then
-                    humanoid.JumpHeight = Value
+        if humanoid and jumpEnabled then
+            -- Backup der Originalwerte, falls noch nicht gesichert
+            if humanoid.JumpPower ~= targetJump and humanoid.JumpHeight ~= targetJump and 
+               humanoid.JumpPower ~= defaultJump and humanoid.JumpHeight ~= defaultJump then
+                defaultJump = humanoid.UseJumpPower and humanoid.JumpPower or humanoid.JumpHeight
+                defaultUseJumpPower = humanoid.UseJumpPower
+            end
+            
+            -- Modi abfragen
+            if jumpMode == "JumpPower" then
+                humanoid.UseJumpPower = true
+                humanoid.JumpPower = targetJump
+            elseif jumpMode == "JumpHeight" then
+                humanoid.UseJumpPower = false
+                humanoid.JumpHeight = targetJump
+            elseif jumpMode == "Hoch TPn" and rootPart then
+                -- Erkennt, wenn der Spieler springt und teleportiert ihn hoch
+                local uis = game:GetService("UserInputService")
+                if uis:IsKeyDown(Enum.KeyCode.Space) and humanoid.FloorMaterial ~= Enum.Material.Air then
+                    rootPart.CFrame = rootPart.CFrame * CFrame.new(0, targetJump / 5, 0)
+                    task.wait(0.2) -- Schutz vor unendlichem Hochfliegen
+                end
+            end
+        end
+    end
+end)
+
+-- ==========================================
+-- FLUENT UI ELEMENTS (In deinen Tab einfügen)
+-- ==========================================
+
+-- Toggle für Jump-Aktivierung und Reset-Spam
+local JumpToggle = Tabs.PLTAB:AddToggle("JumpToggle", {
+    Title = "Enable Custom Jump",
+    Default = false,
+    Callback = function(Value)
+        jumpEnabled = Value
+        
+        -- Beim Ausschalten sofort alles auf Originalzustand zurücksetzen
+        if not jumpEnabled then
+            local character = player.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.UseJumpPower = defaultUseJumpPower
+                if defaultUseJumpPower then
+                    humanoid.JumpPower = defaultJump
+                else
+                    humanoid.JumpHeight = defaultJump
                 end
             end
         end
     end
 })
 
--- 3. TOGGLE FÜR ANTI JUMP RESET
-local AntiJumpToggle = Tabs.PLTAB:AddToggle("AntiJumpReset", {
-    Title = "Anti Jump Reset",
-    Default = false,
+-- Slider für die Sprungkraft / Höhe / TP-Distanz
+local JumpSlider = Tabs.PLTAB:AddSlider("JumpSlider", {
+    Title = "Jump Value",
+    Description = "Stärke für Power, Height oder TP",
+    Min = 0,
+    Max = 500,
+    Default = 50,
+    Rounding = 0,
     Callback = function(Value)
-        antiJumpResetEnabled = Value
+        targetJump = Value
     end
 })
 
--- 4. BUTTON: USE JUMPPOWER AKTIVIEREN + WARNUNG (POP-UP)
-Tabs.PLTAB:AddButton({
-    Title = "Aktiviere UseJumpPower",
-    Description = "Zwingt den Humanoid, JumpPower statt JumpHeight zu nutzen.",
+-- Dropdown für die verschiedenen Modi
+local JumpDropdown = Tabs.PLTAB:AddDropdown("JumpDropdown", {
+    Title = "Jump Mode",
+    Description = "Wähle, wie der Jump verändert wird",
+    Values = {"JumpPower", "JumpHeight", "Hoch TPn"},
+    Default = "JumpPower",
+    Callback = function(Value)
+        jumpMode = Value
+    end
+})
+
+-- Button zum Umschalten von UseJumpPower
+local ToggleUseJumpPowerBtn = Tabs.PLTAB:AddButton({
+    Title = "Toggle UseJumpPower",
+    Description = "Schaltet UseJumpPower im Humanoid um",
     Callback = function()
-        local player = game.Players.LocalPlayer
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.UseJumpPower = true
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.UseJumpPower = not humanoid.UseJumpPower
             
-            -- Fluent Notification (Pop-up)
+            -- Visuelles Feedback über Fluent Notification
             Fluent:Notify({
-                Title = "Warnung!",
-                Content = "UseJumpPower wurde erzwungen. Das könnte Mechaniken des Spiels kaputt machen!",
-                Duration = 7
+                Title = "Humanoid Update",
+                Content = "UseJumpPower steht jetzt auf: " .. tostring(humanoid.UseJumpPower),
+                Duration = 3
             })
         end
     end
 })
 
--- 5. DER JUMP LOOP (Hintergrund-Überwachung)
-game:GetService("RunService").Heartbeat:Connect(function()
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not (humanoid and rootPart) or humanoid.Health <= 0 then return end
 
-    -- Erkennt, ob die Leertaste gedrückt wird / der Spieler springt
-    local isJumping = game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space)
 
-    -- Modus 1: JumpPower Loop (Erzwingen)
-    if currentJumpMode == "JumpPower" and antiJumpResetEnabled then
-        if humanoid.JumpPower ~= jumpValue then
-            humanoid.JumpPower = jumpValue
-        end
 
-    -- Modus 2: JumpHeight Loop (Erzwingen)
-    elseif currentJumpMode == "JumpHeight" and antiJumpResetEnabled then
-        if humanoid.JumpHeight ~= jumpValue then
-            humanoid.JumpHeight = jumpValue
-        end
 
-    -- Modus 3: Velocity Jump (Gibt einen physikalischen Impuls nach oben beim Abspringen)
-    elseif currentJumpMode == "Velocity" then
-        -- Wenn der Spieler springt und sich am Boden befindet
-        if isJumping and rootPart.AssemblyLinearVelocity.Y < 1 then
-            rootPart.AssemblyLinearVelocity = Vector3.new(
-                rootPart.AssemblyLinearVelocity.X,
-                jumpValue, -- Schießt den Spieler nach oben
-                rootPart.AssemblyLinearVelocity.Z
-            )
-        end
+local JumpSection = Tabs.PLTAB:AddSection("fly")
 
-    -- Modus 4: CFrame Jump (Teleportiert dich beim Drücken der Leertaste ruckartig nach oben)
-    elseif currentJumpMode == "CFrame" then
-        if isJumping and rootPart.AssemblyLinearVelocity.Y < 1 then
-            -- Setzt die Position direkt ein paar Studs höher
-            rootPart.CFrame = rootPart.CFrame * CFrame.new(0, jumpValue / 5, 0)
+
+
+
+
+
+local flyEnabled = false
+local flySpeed = 50
+local useAnchored = false
+local useQE = true
+local useKeybind = false
+local flyKey = Enum.KeyCode.F -- Standard-Keybind ist F
+
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local uis = game:GetService("UserInputService")
+
+task.spawn(function()
+    while true do
+        task.wait()
+        local character = player.Character
+        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if rootPart and humanoid and flyEnabled then
+            -- Erzwingt den Flug-Zustand, damit Roblox die Gravitation ignoriert
+            humanoid:ChangeState(Enum.HumanoidStateType.Flying)
+            
+            -- FIX: Verhindert das Umkippen/Drehen des Charakters (Blickrichtung = Kamera)
+            rootPart.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
+            
+            -- Richtungsberechnung
+            local moveDirection = Vector3.zero
+            
+            if uis:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + camera.CFrame.LookVector end
+            if uis:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - camera.CFrame.LookVector end
+            if uis:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + camera.CFrame.RightVector end
+            if uis:IsKeyDown(Enum.KeyCode.A) then moveDirection = moveDirection - camera.CFrame.RightVector end
+            
+            if useQE then
+                if uis:IsKeyDown(Enum.KeyCode.E) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
+                if uis:IsKeyDown(Enum.KeyCode.Q) then moveDirection = moveDirection - Vector3.new(0, 1, 0) end
+            end
+            
+            -- Bewegung anwenden
+            if moveDirection.Magnitude > 0 then
+                if useAnchored then rootPart.Anchored = false end
+                rootPart.AssemblyLinearVelocity = moveDirection.Unit * flySpeed
+            else
+                if useAnchored then
+                    rootPart.Anchored = true
+                else
+                    rootPart.AssemblyLinearVelocity = Vector3.zero
+                end
+            end
+        else
+            -- Reset, wenn Fly ausgeschaltet wird
+            if rootPart and rootPart.Anchored then
+                rootPart.Anchored = false
+            end
         end
     end
 end)
 
--- Variablen für das Fliegen
-local flying = false
-local flySpeed = 50
-local currentFlyMode = "CFrame"
-
--- Steuerungstasten-Überwachung
-local uis = game:GetService("UserInputService")
-local runService = game:GetService("RunService")
-local camera = workspace.CurrentCamera
-
--- 1. DROPDOWN FÜR FLY MODI
-local FlyModeDropdown = Tabs.PLTAB:AddDropdown("FlyMode", {
-    Title = "Fly Modus",
-    Values = {"CFrame", "Anchored CFrame", "Velocity", "Teleport"},
-    Default = "CFrame",
+-- Toggle für das Fliegen selbst
+_G.FlyToggleElement = Tabs.PLTAB:AddToggle("FlyToggle", {
+    Title = "Enable Fly",
+    Description = "Lässt dich in Blickrichtung fliegen",
+    Default = false,
     Callback = function(Value)
-        currentFlyMode = Value
+        flyEnabled = Value
     end
 })
 
--- 2. FLY SPEED SLIDER
-local FlySlider = Tabs.PLTAB:AddSlider("FlySlider", {
+-- Slider für die Fluggeschwindigkeit
+local FlySpeedSlider = Tabs.PLTAB:AddSlider("FlySpeedSlider", {
     Title = "Fly Speed",
-    Description = "Fluggeschwindigkeit anpassen",
-    Default = 50,
     Min = 10,
     Max = 300,
+    Default = 50,
     Rounding = 0,
     Callback = function(Value)
         flySpeed = Value
     end
 })
 
--- 3. TOGGLE FÜR FLY (AN/AUS)
-local FlyToggle = Tabs.PLTAB:AddToggle("FlyToggle", {
-    Title = "Fliegen (Fly)",
+-- Toggle für Anchored-Modus (perfektes Stehenbleiben in der Luft)
+local AnchoredToggle = Tabs.PLTAB:AddToggle("AnchoredToggle", {
+    Title = "Use Anchored",
+    Description = "Friert dich komplett ein, wenn du dich nicht bewegst",
     Default = false,
     Callback = function(Value)
-        flying = Value
-        
-        local player = game.Players.LocalPlayer
-        local character = player.Character
-        if not character then return end
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        local humanoid = character:FindFirstChild("Humanoid")
-        
-        if not rootPart or not humanoid then return end
-        
-        if flying then
-            -- Wenn wir fliegen, deaktivieren wir kurz die Standard-Sterbeanimationen im Core
-            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-        else
-            -- Beim Ausschalten alles wieder normalisieren
-            rootPart.Anchored = false
-            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-            rootPart.AssemblyLinearVelocity = Vector3.zero
+        useAnchored = Value
+    end
+})
+
+-- Toggle für Q/E Steuerung
+local QEToggle = Tabs.PLTAB:AddToggle("QEToggle", {
+    Title = "Enable Q/E Controls",
+    Description = "Nutze Q (Sinken) und E (Steigen)",
+    Default = true,
+    Callback = function(Value)
+        useQE = Value
+    end
+})
+
+local UseKeybindToggle = Tabs.PLTAB:AddToggle("UseKeybindToggle", {
+    Title = "Use Keybind",
+    Description = "Aktiviert die Steuerung über die Tastatur",
+    Default = false,
+    Callback = function(Value)
+        useKeybind = Value
+    end
+})
+
+-- FIX: Offizieller Fluent-Weg für funktionierende Keybinds
+local FlyKeybind = Tabs.PLTAB:AddKeybind("FlyKeybind", {
+    Title = "Fly Keybind",
+    Mode = "Toggle", 
+    Default = "F",
+    Callback = function(Value)
+        -- Der Keybind triggert NUR, wenn der "Use Keybind" Toggle an ist
+        if useKeybind then
+            flyEnabled = not flyEnabled
+            FlyToggle:SetValue(flyEnabled) -- Schaltet den visuellen Haken im UI um
         end
     end
 })
 
--- Funktion zur Berechnung der Flugrichtung basierend auf gedrückten Tasten
-local function getFlyDirection()
-    local dir = Vector3.zero
-    if uis:IsKeyDown(Enum.KeyCode.W) then dir = dir + camera.CFrame.LookVector end
-    if uis:IsKeyDown(Enum.KeyCode.S) then dir = dir - camera.CFrame.LookVector end
-    if uis:IsKeyDown(Enum.KeyCode.D) then dir = dir + camera.CFrame.RightVector end
-    if uis:IsKeyDown(Enum.KeyCode.A) then dir = dir - camera.CFrame.RightVector end
-    if uis:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
-    if uis:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
-    return dir
-end
 
--- 4. DER FLY LOOP (Jeden Frame ausführen)
-runService.Heartbeat:Connect(function(deltaTime)
-    if not flying then return end
-    
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
-    
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not rootPart or not humanoid or humanoid.Health <= 0 then return end
-    
-    -- Richtung holen
-    local flyDir = getFlyDirection()
-    
-    -- Infinite Yield Style: Charakter schaut IMMER exakt dorthin, wo die Kamera hinschaut
-    local camLook = camera.CFrame.LookVector
-    local targetRotation = CFrame.lookAt(rootPart.Position, rootPart.Position + Vector3.new(camLook.X, 0, camLook.Z))
-    
-    -------------------------------------------
-    -- MODUS 1: CFrame (Standard Infinite Yield)
-    -------------------------------------------
-    if currentFlyMode == "CFrame" then
-        rootPart.Anchored = false
-        rootPart.AssemblyLinearVelocity = Vector3.zero -- Schwerkraft ausschalten
-        
-        if flyDir.Magnitude > 0 then
-            rootPart.CFrame = CFrame.new(rootPart.Position + (flyDir.Unit * flySpeed * deltaTime)) * targetRotation.Rotation
-        else
-            rootPart.CFrame = CFrame.new(rootPart.Position) * targetRotation.Rotation
-        end
-        
-    -------------------------------------------
-    -- MODUS 2: Anchored CFrame (Einfrieren)
-    -------------------------------------------
-    elseif currentFlyMode == "Anchored CFrame" then
-        rootPart.Anchored = true -- Komplett im Raum fixieren (unantastbar für Physik)
-        
-        if flyDir.Magnitude > 0 then
-            rootPart.CFrame = CFrame.new(rootPart.Position + (flyDir.Unit * flySpeed * deltaTime)) * targetRotation.Rotation
-        else
-            rootPart.CFrame = CFrame.new(rootPart.Position) * targetRotation.Rotation
-        end
 
-    -------------------------------------------
-    -- MODUS 3: Velocity (Flüssige Physik)
-    -------------------------------------------
-    elseif currentFlyMode == "Velocity" then
-        rootPart.Anchored = false
-        
-        if flyDir.Magnitude > 0 then
-            rootPart.AssemblyLinearVelocity = flyDir.Unit * flySpeed
-        else
-            rootPart.AssemblyLinearVelocity = Vector3.zero -- Schwebend stoppen
-        end
-        -- Drehung trotzdem via CFrame erzwingen
-        rootPart.CFrame = CFrame.new(rootPart.Position) * targetRotation.Rotation
 
-    -------------------------------------------
-    -- MODUS 4: Teleport (Große Sprünge)
-    -------------------------------------------
-    elseif currentFlyMode == "Teleport" then
-        rootPart.Anchored = false
-        rootPart.AssemblyLinearVelocity = Vector3.zero
-        
-        if flyDir.Magnitude > 0 then
-            -- Versetzt dich schubweise vorwärts (bricht manche Prediction-Anti-Cheats)
-            rootPart.CFrame = CFrame.new(rootPart.Position + (flyDir.Unit * (flySpeed / 10))) * targetRotation.Rotation
-        else
-            rootPart.CFrame = CFrame.new(rootPart.Position) * targetRotation.Rotation
+
+
+
+local NoclipSection = Tabs.PLTAB:AddSection("Noclip ")
+
+
+
+
+
+
+
+
+
+
+local noclipEnabled = false
+local useNoclipKeybind = false -- Standardmäßig AUS
+local noclipKey = Enum.KeyCode.V -- Standard-Keybind ist V
+
+local player = game.Players.LocalPlayer
+local runService = game:GetService("RunService")
+
+-- Läuft jeden Physik-Frame, um die Kollision sauber auszuschalten
+runService.Stepped:Connect(function()
+    if noclipEnabled then
+        local character = player.Character
+        if character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
         end
     end
 end)
 
--- Variable, um zu speichern, ob Infinite Jump an oder aus ist
+-- Der Haupt-Toggle für Noclip
+local NoclipToggle = Tabs.PLTAB:AddToggle("NoclipToggle", {
+    Title = "Enable Noclip",
+    Description = "Erlaubt es dir, durch alle Wände und Objekte zu laufen",
+    Default = false,
+    Callback = function(Value)
+        noclipEnabled = Value
+    end
+})
+
+-- Toggle, ob der Keybind aktiv sein darf
+local UseNoclipKeybindToggle = Tabs.PLTAB:AddToggle("UseNoclipKeybindToggle", {
+    Title = "Use Keybind",
+    Description = "Erlaubt das Ein-/Ausschalten von Noclip per Taste",
+    Default = false,
+    Callback = function(Value)
+        useNoclipKeybind = Value
+    end
+})
+
+-- Der Fluent Keybind-Selector
+local NoclipKeybind = Tabs.PLTAB:AddKeybind("NoclipKeybind", {
+    Title = "Noclip Keybind",
+    Mode = "Toggle",
+    Default = "V",
+    Callback = function(Value)
+        if useNoclipKeybind then
+            noclipEnabled = not noclipEnabled
+            NoclipToggle:SetValue(noclipEnabled) -- Aktualisiert den Haken im UI
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+local InfJumpSection = Tabs.PLTAB:AddSection("Infinite Jump")
+
+
+
+
+
+
+
+
+
+
+
+
 local infiniteJumpEnabled = false
 
--- 1. TOGGLE FÜR DEIN MENÜ
-local InfJumpToggle = Tabs.PLTAB:AddToggle("InfiniteJump", {
-    Title = "Infinite Jump",
-    Description = "Ermöglicht unendliche Sprünge in der Luft",
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if infiniteJumpEnabled then
+        local player = game.Players.LocalPlayer
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+
+-- Toggle für unendliches Springen
+local InfJumpToggle = Tabs.PLTAB:AddToggle("InfJumpToggle", {
+    Title = "Enable Infinite Jump",
+    Description = "Erlaubt es dir, unendlich oft in der Luft zu springen",
     Default = false,
     Callback = function(Value)
         infiniteJumpEnabled = Value
     end
 })
 
--- 2. DIE ORIGINAL IY-LOGIK (UserInputService fängt den Tastendruck ab)
-game:GetService("UserInputService").JumpRequest:Connect(function()
-    -- Wenn das Toggle aus ist, machen wir gar nichts
-    if not infiniteJumpEnabled then return end
-    
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    
-    -- Nur springen, wenn der Charakter lebt und existiert
-    if humanoid and rootPart and humanoid.Health > 0 then
-        -- Das ist der originale Trick aus Infinite Yield:
-        -- Wir zwingen den Humanoid in den "Springen"-Zustand...
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        
-        -- ...und geben ihm zusätzlich einen physikalischen Stoß auf der Y-Achse nach oben.
-        -- Wenn du vorhin deine JumpPower/JumpHeight geändert hast, greift der Wert hier direkt!
-        local jumpPower = humanoid.UseJumpPower and humanoid.JumpPower or (humanoid.JumpHeight * 2.5) -- Schätzung, falls JumpHeight genutzt wird
-        rootPart.AssemblyLinearVelocity = Vector3.new(
-            rootPart.AssemblyLinearVelocity.X,
-            jumpPower, -- Setzt die Aufwärtsgeschwindigkeit
-            rootPart.AssemblyLinearVelocity.Z
-        )
+
+
+
+
+
+
+local GravitySection = Tabs.PLTAB:AddSection("Gravity Settings")
+
+
+
+
+local gravityEnabled = false
+local targetGravity = 196.2
+local defaultGravity = 196.2
+
+task.spawn(function()
+    while true do
+        task.wait(0.1) -- Ein kleiner Delay reicht hier, da Gravity nicht so extrem resettet wird
+        if gravityEnabled then
+            workspace.Gravity = targetGravity
+        end
     end
 end)
 
--- ==========================================
--- NOCLIP SETUP
--- ==========================================
-local noclipEnabled = false
-local currentNoclipMode = "Experimental TP"
 
-local NoclipDropdown = Tabs.PLTAB:AddDropdown("NoclipMode", {
-    Title = "Noclip Modus",
-    Values = {"Experimental TP", "Classic Loop", "Velocity Phase"},
-    Default = "Experimental TP",
-    Callback = function(Value)
-        currentNoclipMode = Value
-    end
-})
-
-local NoclipToggle = Tabs.PLTAB:AddToggle("NoclipToggle", {
-    Title = "Noclip",
-    Description = "Gehe durch Wände hindurch",
+-- Toggle für die Gravitation
+local GravityToggle = Tabs.PLTAB:AddToggle("GravityToggle", {
+    Title = "Enable Custom Gravity",
+    Description = "Aktiviert die benutzerdefinierte Gravitation",
     Default = false,
     Callback = function(Value)
-        noclipEnabled = Value
+        gravityEnabled = Value
         
-        -- Sofortiges Zurücksetzen beim Ausschalten
-        if not noclipEnabled then
-            local player = game.Players.LocalPlayer
-            local character = player.Character
-            if character then
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then rootPart.Anchored = false end
-                
-                -- Kollision für alle Teile sofort wieder aktivieren
-                for _, part in pairs(character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                    end
-                end
-            end
+        if gravityEnabled then
+            -- Sichert den aktuellen Wert des Spiels genau beim Einschalten
+            defaultGravity = workspace.Gravity
+            workspace.Gravity = targetGravity
+        else
+            -- Setzt den Wert beim Ausschalten sofort auf den gesicherten Standardwert zurück
+            workspace.Gravity = defaultGravity
         end
     end
 })
 
-local function getMoveDirection()
-    local dir = Vector3.zero
-    local player = game.Players.LocalPlayer
-    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return dir end
-    return player.Character.Humanoid.MoveDirection
+-- Slider für den Gravity-Wert
+local GravitySlider = Tabs.PLTAB:AddSlider("GravitySlider", {
+    Title = "Gravity Power",
+    Description = "Niedriger = Mondgravitation, Höher = Schwerer",
+    Min = 0,
+    Max = 1000,
+    Default = 196,
+    Rounding = 0,
+    Callback = function(Value)
+        targetGravity = Value
+        -- Falls der Toggle schon an ist, den Wert sofort live anwenden
+        if gravityEnabled then
+            workspace.Gravity = targetGravity
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+local waypoints = {}
+local showWaypointsESP = false
+local customGuiEnabled = false
+
+local player = game.Players.LocalPlayer
+local pGui = player:WaitForChild("PlayerGui")
+local runService = game:GetService("RunService")
+
+-- Referenzen für die dynamischen GUIs
+local screenGui = nil
+local espFolder = Instance.new("Folder")
+espFolder.Name = "WaypointESP_Folder"
+espFolder.Parent = workspace
+
+-- Funktion zum Aktualisieren der 3D-Anzeige (ESP)
+local function updateWaypointESP()
+    espFolder:ClearAllChildren()
+    if not showWaypointsESP then return end
+
+    for name, pos in pairs(waypoints) do
+        local part = Instance.new("Part")
+        part.Size = Vector3.new(1, 1, 1)
+        part.Position = pos
+        part.Anchored = true
+        part.CanCollide = false
+        part.Transparency = 1
+        part.Parent = espFolder
+
+        local bGui = Instance.new("BillboardGui")
+        bGui.Size = UDim2.new(0, 200, 0, 50)
+        bGui.AlwaysOnTop = true
+        bGui.Adornee = part
+        bGui.Parent = part
+
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Text = "[" .. name .. "]"
+        textLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+        textLabel.TextSize = 14
+        textLabel.Font = Enum.Font.SourceSansBold
+        textLabel.Parent = bGui
+    end
 end
 
-runService.Stepped:Connect(function()
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
+-- Funktion zum Aktualisieren der Custom Listen-GUI
+local function refreshCustomGui()
+    if not customGuiEnabled or not screenGui then return end
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChild("Humanoid")
-    if not rootPart or not humanoid or humanoid.Health <= 0 then return end
+    local frame = screenGui:FindFirstChild("MainFrame")
+    if not frame then return end
     
-    -- WENN NOCLIP AKTIV IST:
-    if noclipEnabled then
-        if currentNoclipMode == "Experimental TP" then
-            local moveDir = getMoveDirection()
-            
-            if moveDir.Magnitude > 0 then
-                local raycastParams = RaycastParams.new()
-                raycastParams.FilterDescendantsInstances = {character}
-                raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-                
-                local rayOrigin = rootPart.Position
-                local rayDirection = moveDir * 3
-                local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                
-                if raycastResult and raycastResult.Instance then
-                    local hitPart = raycastResult.Instance
-                    local hitNormal = raycastResult.Normal
-                    local isWall = math.abs(hitNormal.Y) < 0.7
-                    
-                    if isWall and hitPart.CanCollide then
-                        rootPart.Anchored = true
-                        rootPart.CFrame = rootPart.CFrame + (moveDir * 1.5)
-                        return
+    local scroll = frame:FindFirstChild("ScrollList")
+    scroll:ClearAllChildren()
+    
+    -- UI List Layout für saubere Untereinander-Anordnung
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 5)
+    layout.Parent = scroll
+
+    local yOffset = 0
+    for name, pos in pairs(waypoints) do
+        local item = Instance.new("Frame")
+        item.Size = UDim2.new(1, 0, 0, 30)
+        item.BackgroundTransparency = 0.8
+        item.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        item.Parent = scroll
+
+        -- Name des Wegpunkts
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0.4, 0, 1, 0)
+        lbl.Text = name
+        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.BackgroundTransparency = 1
+        lbl.Parent = item
+
+        -- TP Button
+        local tpBtn = Instance.new("TextButton")
+        tpBtn.Size = UDim2.new(0.18, 0, 0.8, 0)
+        tpBtn.Position = UDim2.new(0.42, 0, 0.1, 0)
+        tpBtn.Text = "TP"
+        tpBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tpBtn.Parent = item
+        tpBtn.MouseButton1Click:Connect(function()
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = CFrame.new(pos)
+            end
+        end)
+
+        -- Rename Button
+        local renBtn = Instance.new("TextButton")
+        renBtn.Size = UDim2.new(0.18, 0, 0.8, 0)
+        renBtn.Position = UDim2.new(0.61, 0, 0.1, 0)
+        renBtn.Text = "Rename"
+        renBtn.BackgroundColor3 = Color3.fromRGB(150, 150, 0)
+        renBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        renBtn.Parent = item
+        renBtn.MouseButton1Click:Connect(function()
+            -- Öffnet Fluents eingebautes Input-Fenster für die Umbenennung
+            local Window = _G.FluentWindowInstance -- Stellt sicher, dass das Window global definiert ist oder genutzt wird
+            Fluent:InputPrompt({
+                Title = "Waypoint umbenennen",
+                SubTitle = "Gib einen neuen Namen ein:",
+                DoneKeyword = "Confirm",
+                Callback = function(newName)
+                    if newName and newName ~= "" and not waypoints[newName] then
+                        waypoints[newName] = pos
+                        waypoints[name] = nil
+                        refreshCustomGui()
+                        updateWaypointESP()
                     end
                 end
-            end
-            rootPart.Anchored = false
-            
-        elseif currentNoclipMode == "Classic Loop" then
-            rootPart.Anchored = false
-            for _, part in pairs(character:GetChildren()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-            
-        elseif currentNoclipMode == "Velocity Phase" then
-            rootPart.Anchored = false
-            local moveDir = getMoveDirection()
-            
-            for _, part in pairs(character:GetChildren()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-            
-            if moveDir.Magnitude > 0 then
-                rootPart.AssemblyLinearVelocity = Vector3.new(
-                    moveDir.X * (humanoid.WalkSpeed * 1.5),
-                    rootPart.AssemblyLinearVelocity.Y, 
-                    moveDir.Z * (humanoid.WalkSpeed * 1.5)
-                )
-            end
-        end
-        
-    -- WENN NOCLIP AUS IST (Sicherheits-Loop fürs Zurücksetzen):
-    else
-        -- Stellt sicher, dass Roblox die Kollision nicht im nächsten Frame wieder deaktiviert
-        for _, part in pairs(character:GetChildren()) do
-            if part:IsA("BasePart") and not part.CanCollide then
-                -- HumanoidRootPart sollte im normalen Zustand standardmäßig CanCollide = false haben,
-                -- alle anderen Körperteile (Torso, Beine, Arme) müssen true sein.
-                if part.Name ~= "HumanoidRootPart" then
-                    part.CanCollide = true
-                end
-            end
-        end
-    end
-end)
+            })
+        end)
 
--- ==========================================
--- KILL BUTTON WITH DIALOG
--- ==========================================
-Tabs.PLTAB:AddButton({
-    Title = "Reset Character (Kill)",
-    Description = "Setzt deinen Charakter sofort zurück",
+        -- Delete Button
+        local delBtn = Instance.new("TextButton")
+        delBtn.Size = UDim2.new(0.18, 0, 0.8, 0)
+        delBtn.Position = UDim2.new(0.8, 0, 0.1, 0)
+        delBtn.Text = "X"
+        delBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        delBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        delBtn.Parent = item
+        delBtn.MouseButton1Click:Connect(function()
+            waypoints[name] = nil
+            refreshCustomGui()
+            updateWaypointESP()
+        end)
+    end
+end
+
+-- Funktion zum Erstellen / Löschen der Custom-GUI-Basis
+local function toggleCustomGui(Value)
+    customGuiEnabled = Value
+    if screenGui then screenGui:Destroy() end
+    
+    if customGuiEnabled then
+        screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "WaypointCustomGUI"
+        screenGui.ResetOnSpawn = false
+        screenGui.Parent = pGui
+
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Name = "MainFrame"
+        mainFrame.Size = UDim2.new(0, 250, 0, 300)
+        mainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+        mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        mainFrame.Active = true
+        mainFrame.Draggable = true -- Macht das Fenster verschiebbar
+        mainFrame.Parent = screenGui
+
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, 0, 0, 25)
+        title.Text = "Waypoints List"
+        title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        title.Parent = mainFrame
+
+        local scrollList = Instance.new("ScrollingFrame")
+        scrollList.Name = "ScrollList"
+        scrollList.Size = UDim2.new(0.95, 0, 0.85, 0)
+        scrollList.Position = UDim2.new(0.025, 0, 0.12, 0)
+        scrollList.BackgroundTransparency = 1
+        scrollList.CanvasSize = UDim2.new(0, 0, 2, 0)
+        scrollList.ScrollBarThickness = 4
+        scrollList.Parent = mainFrame
+
+        refreshCustomGui()
+    end
+end
+
+local WaypointSection = Tabs.Waypoints:AddSection("Waypoint Management")
+
+-- Toggle für die Custom-GUI-Liste auf dem Bildschirm
+local GuiToggle = Tabs.Waypoints:AddToggle("WaypointGuiToggle", {
+    Title = "Show Custom Waypoint Menu",
+    Description = "Öffnet eine Liste aller Punkte auf deinem Bildschirm",
+    Default = false,
+    Callback = function(Value)
+        toggleCustomGui(Value)
+    end
+})
+
+-- Toggle für das 3D-ESP der Wegpunkte
+local EspToggle = Tabs.Waypoints:AddToggle("WaypointEspToggle", {
+    Title = "Show Waypoints (ESP)",
+    Description = "Zeigt die Wegpunkte und deren Namen in der Welt an",
+    Default = false,
+    Callback = function(Value)
+        showWaypointsESP = Value
+        updateWaypointESP()
+    end
+})
+
+-- Button zum Erstellen eines neuen Wegpunkts
+local CreateWpBtn = Tabs.Waypoints:AddButton({
+    Title = "Create Waypoint",
+    Description = "Speichert deine aktuelle Position",
     Callback = function()
-        Window:Dialog({
-            Title = "Bist du dir sicher?",
-            Content = "Dein Charakter wird sofort getötet und du musst neu spawnen.",
-            Buttons = {
-                {
-                    Title = "Ja, killen",
-                    Callback = function()
-                        local player = game.Players.LocalPlayer
-                        if player.Character and player.Character:FindFirstChild("Humanoid") then
-                            player.Character.Humanoid.Health = 0
-                        else
-                            Fluent:Notify({
-                                Title = "Fehler",
-                                Content = "Kein lebendiger Charakter gefunden!",
-                                Duration = 3
-                            })
-                        end
-                    end
-                },
-                {
-                    Title = "Abbrechen",
-                    Callback = function()
-                        -- Hier passiert nichts, das Dialog-Fenster schließt sich einfach
-                    end
-                }
-            }
-        })
-    end
-})
-
--- ==========================================
--- ANTI FALL DAMAGE SETUP
--- ==========================================
-local antiFallEnabled = false
-local currentFallMode = "No State Reset"
-
-local AntiFallDropdown = Tabs.PLTAB:AddDropdown("AntiFallMode", {
-    Title = "Anti Fall Damage Modus",
-    Values = {"No State Reset", "Velocity Break", "Freefall Spoof"},
-    Default = "No State Reset",
-    Callback = function(Value)
-        currentFallMode = Value
-    end
-})
-
-local AntiFallToggle = Tabs.PLTAB:AddToggle("AntiFallToggle", {
-    Title = "Anti Fall Damage",
-    Description = "Schützt vor Sturzschaden",
-    Default = false,
-    Callback = function(Value)
-        antiFallEnabled = Value
-    end
-})
-
--- Loop für die verschiedenen Erkennungsmethoden
-game:GetService("RunService").Heartbeat:Connect(function()
-    if not antiFallEnabled then return end
-    
-    local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not (humanoid and rootPart) or humanoid.Health <= 0 then return end
-
-    -- MODUS 1: No State Reset (Standard für viele Spiele)
-    -- Verhindert, dass der Charakter den "Landed" (Gelandet) Status triggert, 
-    -- an dem viele Spiele ihren Schaden festmachen.
-    if currentFallMode == "No State Reset" then
-        if humanoid:GetState() == Enum.HumanoidStateType.Freefall then
-            -- Sobald wir fallen, zwingen wir den Humanoid in den Running-State, 
-            -- bevor das Spiel merkt, dass wir aufgekommen sind.
-            humanoid:ChangeState(Enum.HumanoidStateType.Running)
-        end
-
-    -- MODUS 2: Velocity Break (Für Spiele, die die Aufprallgeschwindigkeit messen)
-    -- Wenn du extrem schnell fällst, bremst das Skript dich kurz vor dem Boden sanft ab.
-    elseif currentFallMode == "Velocity Break" then
-        if rootPart.AssemblyLinearVelocity.Y < -40 then -- Wenn du schnell fällst
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {character}
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-            
-            -- Prüfen, ob der Boden kurz bevorsteht (10 Studs unter dir)
-            local raycastResult = workspace:Raycast(rootPart.Position, Vector3.new(0, -10, 0), raycastParams)
-            
-            if raycastResult then
-                -- Fallgeschwindigkeit kurz vor dem Aufprall auf fast 0 setzen
-                rootPart.AssemblyLinearVelocity = Vector3.new(
-                    rootPart.AssemblyLinearVelocity.X,
-                    -2, -- Sanftes Aufkommen
-                    rootPart.AssemblyLinearVelocity.Z
-                )
-            end
-        end
-
-    -- MODUS 3: Freefall Spoof (Für Spiele mit serverseitiger Abfrage)
-    -- Deaktiviert den Freefall-Status komplett, sodass das Spiel denkt, du läufst permanent.
-    elseif currentFallMode == "Freefall Spoof" then
-        humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-    end
-end)
-
--- Wenn der Schalter ausgeschaltet wird, den Status wieder erlauben (wichtig für Modus 3)
-task.spawn(function()
-    while task.wait(0.5) do
-        if not antiFallEnabled then
-            local player = game.Players.LocalPlayer
-            if player.Character and player.Character:FindFirstChild("Humanoid") then
-                player.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
-            end
-        end
-    end
-end)
-
--- ==========================================
--- ANTI SIT SETUP
--- ==========================================
-local antiSitEnabled = false
-
-local SitToggle = Tabs.PLTAB:AddToggle("AntiSit", {
-    Title = "Anti Sit (Sitz-Blocker)",
-    Description = "Verhindert, dass du dich versehentlich auf Stühle oder in Autos setzt",
-    Default = false,
-    Callback = function(Value)
-        antiSitEnabled = Value
-    end
-})
-
-game:GetService("RunService").Heartbeat:Connect(function()
-    local player = game.Players.LocalPlayer
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        local humanoid = player.Character.Humanoid
+        local char = player.Character
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
         
-        if antiSitEnabled then
-            -- Verhindert das automatische Einrasten auf Sitzen
-            humanoid.Sit = false
+        if rootPart then
+            local currentPos = rootPart.Position
+            -- Generiert einen Standardnamen basierend auf der Anzahl der Punkte
+            local count = 0
+            for _ in pairs(waypoints) do count = count + 1 end
+            local wpName = "Waypoint " .. (count + 1)
+            
+            waypoints[wpName] = currentPos
+            
+            -- Interfaces live updaten
+            refreshCustomGui()
+            updateWaypointESP()
+            
+            Fluent:Notify({
+                Title = "Waypoint Created",
+                Content = "Gespeichert als: " .. wpName,
+                Duration = 3
+            })
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local aimbotEnabled = false
+local predictionEnabled = false
+local teamCheck = true
+local wallCheck = false
+local onlyLockShot = false
+local triggerbotEnabled = false
+local fovCircleEnabled = false
+
+local aimPart = "Head"
+local smoothingValue = 1 -- 1 = Sofort (kein Smoothing), Höher = Sanfter
+local fovRadius = 100
+
+local player = game.Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local mouse = player:GetMouse()
+local runService = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+
+-- FOV Kreis erstellen
+local fovCircle = Drawing.new("Circle")
+fovCircle.Visible = false
+fovCircle.Color = Color3.fromRGB(255, 0, 0)
+fovCircle.Thickness = 1
+fovCircle.NumSides = 64
+fovCircle.Radius = fovRadius
+fovCircle.Filled = false
+
+local function isEnemy(targetPlayer)
+    if not teamCheck then return true end
+    return targetPlayer.Team ~= player.Team
+end
+
+-- Prüft, ob eine Wand zwischen deiner Kamera und dem Gegner ist
+local function isVisible(targetPart)
+    if not wallCheck then return true end
+    local castRay = Ray.new(camera.CFrame.Position, (targetPart.Position - camera.CFrame.Position).Unit * 1000)
+    local hit, position = workspace:FindPartOnRayWithIgnoreList(castRay, {player.Character, targetPart.Parent})
+    return hit == nil
+end
+
+-- Sucht den besten Gegner im FOV-Kreis
+local function getClosestPlayerToMouse()
+    local closestPlayer = nil
+    local shortestDistance = fovCircleEnabled and fovRadius or math.huge
+
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= player and v.Character and v.Character:FindFirstChild(aimPart) and v.Character:FindFirstChildOfClass("Humanoid") then
+            if v.Character.Humanoid.Health > 0 and isEnemy(v) and isVisible(v.Character[aimPart]) then
+                local pos, onScreen = camera:WorldToViewportPoint(v.Character[aimPart].Position)
+                if onScreen then
+                    local mousePos = Vector2.new(mouse.X, mouse.Y)
+                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = v
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- AIMBOT & FOV LOOP
+runService.RenderStepped:Connect(function()
+    -- FOV Kreis an der Maus positionieren und updaten
+    if fovCircleEnabled then
+        fovCircle.Position = Vector2.new(mouse.X, mouse.Y + 36) -- +36 gleicht den Roblox-Top-Bar-Offset aus
+        fovCircle.Radius = fovRadius
+        fovCircle.Visible = true
+    else
+        fovCircle.Visible = false
+    end
+
+    -- Aimbot Logik
+    if aimbotEnabled then
+        -- Prüfen, ob "Only Lock Shot" aktiv ist und ob geschossen (Klick gehalten) wird
+        if onlyLockShot and not uis:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            return
+        end
+
+        local target = getClosestPlayerToMouse()
+        if target and target.Character and target.Character:FindFirstChild(aimPart) then
+            local targetPosition = target.Character[aimPart].Position
+            
+            -- PREDICTION: Berechnet die Bewegung basierend auf der Geschwindigkeit des Gegners
+            if predictionEnabled and target.Character:FindFirstChild("HumanoidRootPart") then
+                local velocity = target.Character.HumanoidRootPart.AssemblyLinearVelocity
+                -- Eine einfache Zeit-Konstante (0.135) simuliert die Flugzeit/Ping
+                targetPosition = targetPosition + (velocity * 0.135)
+            end
+
+            -- SMOOTHING (Interpolation / Glättung)
+            local targetCFrame = CFrame.new(camera.CFrame.Position, targetPosition)
+            camera.CFrame = camera.CFrame:Lerp(targetCFrame, 1 / smoothingValue)
         end
     end
 end)
 
--- ==========================================
--- AIMBOT SETUP & VARIABLES
--- ==========================================
-local aimbotEnabled = false
-local currentAimMode = "Camera (Memory)"
-local currentTargetPart = "Kopf"
-local customFolderTargeting = false
-local aimSmoothness = 0
-local predictionEnabled = false
-local predictionStrength = 0.1
-
--- Neue Filter-Variablen
-local aimWallCheck = false
-local aimTeamCheck = false
-local aimDeadCheck = true -- Standardmäßig an, da man selten auf Tote zielt
-
--- FOV Variablen (Kompatibler Fallback)
-local fovCircleEnabled = false
-local fovCircleRadius = 100
-local FOVCircle = nil
-
--- Sicherer Drawing-API Check um UNC-Fehler zu vermeiden
-local hasDrawing = pcall(function()
-    FOVCircle = Drawing.new("Circle")
-    FOVCircle.Color = Color3.fromRGB(255, 0, 50)
-    FOVCircle.Thickness = 1.5
-    FOVCircle.Filled = false
-    FOVCircle.Transparency = 1
-    FOVCircle.Visible = false
+-- TRIGGERBOT LOOP
+task.spawn(function()
+    while true do
+        task.wait(0.02)
+        if triggerbotEnabled and mouse.Target then
+            local hitPart = mouse.Target
+            local character = hitPart.Parent
+            if character:IsA("Accessory") then character = character.Parent end
+            
+            local targetPlayer = game.Players:GetPlayerFromCharacter(character)
+            if targetPlayer and targetPlayer ~= player and isEnemy(targetPlayer) then
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.Health > 0 and isVisible(hitPart) then
+                    mouse1press()
+                    task.wait(0.03)
+                    mouse1release()
+                end
+            end
+        end
+    end
 end)
 
--- ------------------------------------------
--- AIMBOT INTERFACE (COMBAT TAB)
--- ------------------------------------------
-Tabs.Combat:AddParagraph({
-    Title = "Advanced Aimbot",
-    Content = "Universeller, optimierter Aimbot mit erweiterten Sicherheits-Filtern."
-})
+local AimbotSection = Tabs.Combat:AddSection("Aimbot Settings")
 
+-- Haupt-Aimbot Schalter
 local AimbotToggle = Tabs.Combat:AddToggle("AimbotToggle", {
-    Title = "Aimbot Aktivieren",
+    Title = "Enable Aimbot",
+    Description = "Aktiviert die Zielhilfe",
     Default = false,
     Callback = function(Value) aimbotEnabled = Value end
 })
 
-local AimModeDropdown = Tabs.Combat:AddDropdown("AimMode", {
-    Title = "Aimbot Methode",
-    Values = {"Camera (Memory)", "Mouse (Imitate)"},
-    Default = "Camera (Memory)",
-    Callback = function(Value) currentAimMode = Value end
-})
-
-local TargetPartDropdown = Tabs.Combat:AddDropdown("TargetPart", {
-    Title = "Ziel-Bereich",
-    Values = {"Kopf", "Körper", "Modell-Mitte"},
-    Default = "Kopf",
-    Callback = function(Value) currentTargetPart = Value end
-})
-
--- FILTER SECTION
-local WallToggle = Tabs.Combat:AddToggle("WallCheck", {
-    Title = "Wall Check (Sichtbarkeits-Prüfung)",
-    Description = "Zielt nur auf Gegner, die du auch sehen kannst.",
-    Default = false,
-    Callback = function(Value) aimWallCheck = Value end
-})
-
-local TeamToggle = Tabs.Combat:AddToggle("AimTeamCheck", {
-    Title = "Team Check",
-    Description = "Ignoriert Spieler in deinem Team.",
-    Default = false,
-    Callback = function(Value) aimTeamCheck = Value end
-})
-
-local DeadToggle = Tabs.Combat:AddToggle("AimDeadCheck", {
-    Title = "Dead Check",
-    Description = "Ignoriert tote Spieler.",
-    Default = true,
-    Callback = function(Value) aimDeadCheck = Value end
-})
-
-local PlayerFinderToggle = Tabs.Combat:AddToggle("PlayerFinder", {
-    Title = "Custom Player Finder (Ordner-Scan)",
-    Default = false,
-    Callback = function(Value) customFolderTargeting = Value end
-})
-
-local SmoothSlider = Tabs.Combat:AddSlider("AimSmooth", {
-    Title = "Aimbot Glättung (Smoothness)",
-    Default = 0,
-    Min = 0,
-    Max = 1,
-    Rounding = 2,
-    Callback = function(Value) aimSmoothness = Value end
-})
-
+-- Prediction Schalter
 local PredToggle = Tabs.Combat:AddToggle("PredToggle", {
-    Title = "Prediction (Vorhaltewinkel)",
+    Title = "Enable Prediction",
+    Description = "Berechnet Laufwege bei sich bewegenden Zielen",
     Default = false,
     Callback = function(Value) predictionEnabled = Value end
 })
 
-local PredSlider = Tabs.Combat:AddSlider("PredStrength", {
-    Title = "Prediction Stärke",
-    Default = 0.1,
-    Min = 0,
-    Max = 2,
-    Rounding = 2,
-    Callback = function(Value) predictionStrength = Value end
+-- Only Lock Shot Schalter
+local LockShotToggle = Tabs.Combat:AddToggle("LockShotToggle", {
+    Title = "Only Lock Shot",
+    Description = "Visieert Gegner NUR an, wenn du Linksklick drückst/hältst",
+    Default = false,
+    Callback = function(Value) onlyLockShot = Value end
 })
 
-if hasDrawing then
-    local FOVToggle = Tabs.Combat:AddToggle("FOVToggle", {
-        Title = "FOV Kreis anzeigen",
-        Default = false,
-        Callback = function(Value)
-            fovCircleEnabled = Value
-            if FOVCircle then FOVCircle.Visible = Value end
-        end
-    })
+-- Smoothing Slider
+local SmoothSlider = Tabs.Combat:AddSlider("SmoothSlider", {
+    Title = "Smoothing / Glättung",
+    Description = "1 = Direkt (Rage), Höher = Menschlicher & Sanfter",
+    Min = 1,
+    Max = 20,
+    Default = 5,
+    Rounding = 0,
+    Callback = function(Value) smoothingValue = Value end
+})
 
-    local FOVSlider = Tabs.Combat:AddSlider("FOVRadius", {
-        Title = "FOV Kreis Größe",
-        Default = 100,
-        Min = 10,
-        Max = 600,
-        Rounding = 0,
-        Callback = function(Value)
-            fovCircleRadius = Value
-            if FOVCircle then FOVCircle.Radius = Value end
-        end
-    })
-end
+-- Dropdown für das Ziel-Körperteil
+local BoneDropdown = Tabs.Combat:AddDropdown("BoneDropdown", {
+    Title = "Target Bone",
+    Description = "Kopf oder Körper anvisieren",
+    Values = {"Head", "HumanoidRootPart"},
+    Default = "Head",
+    Callback = function(Value) aimPart = Value end
+})
 
--- ==========================================
--- AIMBOT LOGIC & CALCULATION (OPTIMIZED)
--- ==========================================
-local camera = workspace.CurrentCamera
-local lPlayer = game.Players.LocalPlayer
+local FilterSection = Tabs.Combat:AddSection("Filters & FOV")
 
--- Modernes, stabiles Raycasting für den Wall Check
-local function isVisible(part, character)
-    if not aimWallCheck then return true end
-    
-    local origin = camera.CFrame.Position
-    local direction = part.Position - origin
-    
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    -- Wir ignorieren dich selbst, das gegnerische Modell und Zubehör/Hüte
-    raycastParams.FilterDescendantsInstances = {lPlayer.Character, character, camera}
-    raycastParams.IgnoreWater = true
-    
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    
-    -- Wenn der Strahl nichts trifft, ist der Weg frei. 
-    -- Wenn er was trifft, prüfen wir, ob es eine Wand (CanCollide = true) ist.
-    if result then
-        if result.Instance.CanCollide == false then
-            return true -- Ignoriere transparente/durchlässige Deko-Wände
-        end
-        return false -- Feste Wand blockiert die Sicht
-    end
-    
-    return true
-end
+-- Team Check Schalter
+local TeamToggle = Tabs.Combat:AddToggle("TeamToggle", {
+    Title = "Team Check",
+    Description = "Ignoriert deine Teammitglieder",
+    Default = true,
+    Callback = function(Value) teamCheck = Value end
+})
 
-local function getTargetPart(character)
-    if currentTargetPart == "Kopf" then
-        return character:FindFirstChild("Head") or character:FindFirstChild("UpperTorso")
-    elseif currentTargetPart == "Körper" then
-        return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
-    elseif currentTargetPart == "Modell-Mitte" then
-        return character:FindFirstChildOfClass("BasePart")
-    end
-    return nil
-end
+-- Wall Check Schalter
+local WallToggle = Tabs.Combat:AddToggle("WallToggle", {
+    Title = "Wall Check",
+    Description = "Visieert keine Gegner hinter Wänden an",
+    Default = false,
+    Callback = function(Value) wallCheck = Value end
+})
 
-local function getClosestPlayer()
-    local closestTarget = nil
-    local shortestDistance = fovCircleRadius
-    local targets = {}
-    
-    if customFolderTargeting then
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") and obj ~= lPlayer.Character then
-                table.insert(targets, obj)
-            end
-        end
-    else
-        for _, p in pairs(game.Players:GetPlayers()) do
-            if p ~= lPlayer and p.Character then
-                if not (aimTeamCheck and p.Team == lPlayer.Team) then
-                    table.insert(targets, p.Character)
-                end
-            end
-        end
-    end
-    
-    for _, char in pairs(targets) do
-        local part = getTargetPart(char)
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        
-        local isAlive = true
-        if humanoid and humanoid.Health <= 0 then isAlive = false end
-        
-        if part and (not aimDeadCheck or isAlive) then
-            -- Erst auf dem Bildschirm prüfen, um Performance bei Raycasts zu sparen
-            local pos, onScreen = camera:WorldToViewportPoint(part.Position)
-            
-            if onScreen then
-                local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-                local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                
-                if distance < shortestDistance then
-                    -- Nur wenn er im FOV ist, werfen wir den präzisen Wall-Check an
-                    if isVisible(part, char) then
-                        shortestDistance = distance
-                        closestTarget = char
-                    end
-                end
-            end
-        end
-    end
-    
-    return closestTarget
-end
+-- FOV Circle Schalter
+local FovToggle = Tabs.Combat:AddToggle("FovToggle", {
+    Title = "Show FOV Circle",
+    Description = "Zeigt den Erfassungsradius um deine Maus",
+    Default = false,
+    Callback = function(Value) fovCircleEnabled = Value end
+})
 
-game:GetService("RunService").RenderStepped:Connect(function()
-    if hasDrawing and fovCircleEnabled and FOVCircle then
-        FOVCircle.Position = game:GetService("UserInputService"):GetMouseLocation()
-    end
-    
-    if not aimbotEnabled then return end
-    
-    local targetChar = getClosestPlayer()
-    if targetChar then
-        local targetPart = getTargetPart(targetChar)
-        if targetPart then
-            local targetPosition = targetPart.Position
-            
-            if currentTargetPart == "Modell-Mitte" then
-                local cframe, _ = targetChar:GetBoundingBox()
-                targetPosition = cframe.Position
-            end
-            
-            if predictionEnabled then
-                local velocityPart = targetChar:FindFirstChild("HumanoidRootPart") or targetPart
-                if velocityPart and velocityPart:IsA("BasePart") then
-                    targetPosition = targetPosition + (velocityPart.AssemblyLinearVelocity * (predictionStrength / 10))
-                end
-            end
-            
-            -- WEICHHEIT/SMOOTHNESS BERECHNEN
-            local alpha = 1 - math.clamp(aimSmoothness, 0, 0.98)
-            
-            if currentAimMode == "Camera (Memory)" then
-                local currentCFrame = camera.CFrame
-                local targetCFrame = CFrame.new(currentCFrame.Position, targetPosition)
-                camera.CFrame = currentCFrame:Lerp(targetCFrame, alpha)
-                
-            elseif currentAimMode == "Mouse (Imitate)" then
-                local screenPos, onScreen = camera:WorldToViewportPoint(targetPosition)
-                if onScreen then
-                    -- GetMouseLocation berücksichtigt das GUI-Offset (Topbar)
-                    local mousePos = game:GetService("UserInputService"):GetMouseLocation()
-                    
-                    -- Berechne die Distanz, die die Maus zurücklegen muss
-                    local targetX = (screenPos.X - mousePos.X)
-                    local targetY = (screenPos.Y - mousePos.Y)
-                    
-                    if mousemoverel then
-                        -- Falls vorhanden, nutzen wir relative Mausbewegung (pixelgenau)
-                        mousemoverel(targetX * alpha, targetY * alpha)
-                    else
-                        -- Prallfester, absoluter VirtualUser Fix:
-                        -- Wandelt das UI-Koordinatensystem exakt in globale Bildschirm-Pixel um
-                        local finalX = mousePos.X + (targetX * alpha)
-                        local finalY = mousePos.Y + (targetY * alpha)
-                        
-                        local vu = game:GetService("VirtualUser")
-                        vu:CaptureController()
-                        -- Injektion direkt auf die berechnete 2D-Fläche
-                        vu:MoveMouseToVector2(Vector2.new(finalX, finalY))
-                    end
-                end
-            end
-        end
-    end
-end)
+-- FOV Size Slider
+local FovSlider = Tabs.Combat:AddSlider("FovSlider", {
+    Title = "FOV Radius Size",
+    Min = 10,
+    Max = 600,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(Value) fovRadius = Value end
+})
 
--- ==========================================
--- COMPLETE TRIGGERBOT ENGINE (SORRA BYPASS)
--- ==========================================
+local TriggerbotSection = Tabs.Combat:AddSection("Triggerbot Settings")
 
-local MeinCombatTab = Tabs.Combat -- Holt sich das Element aus deiner Tabelle
-
--- ==========================================
--- VARIABLES
--- ==========================================
-local triggerbotEnabled = false
-local aimTeamCheck = false
-local aimDeadCheck = true
-local triggerRealismDelay = 0.1
-
--- ==========================================
--- UI INTERFACE (Fluent UI)
--- ==========================================
-MeinCombatTab:AddToggle("TriggerToggle", {
-    Title = "Triggerbot Aktivieren",
-    Description = "Schaltet den PC-Maus-Triggerbot ein oder aus.",
+-- Triggerbot Schalter
+local TriggerToggle = Tabs.Combat:AddToggle("TriggerToggle", {
+    Title = "Enable Triggerbot",
+    Description = "Schießt automatisch, sobald dein Fadenkreuz auf einem Gegner ist",
     Default = false,
     Callback = function(Value) triggerbotEnabled = Value end
 })
 
-MeinCombatTab:AddToggle("AimTeamCheck", {
-    Title = "Team Check",
-    Description = "Ignoriert Spieler in deinem eigenen Team.",
-    Default = false,
-    Callback = function(Value) aimTeamCheck = Value end
-})
 
-MeinCombatTab:AddToggle("AimDeadCheck", {
-    Title = "Dead Check",
-    Description = "Ignoriert Spieler, die bereits tot sind.",
-    Default = true,
-    Callback = function(Value) aimDeadCheck = Value end
-})
 
-MeinCombatTab:AddSlider("TriggerDelay", {
-    Title = "Reaktions-Verzögerung",
-    Description = "Simuliert eine menschliche Verzögerung vor dem Schuss.",
-    Default = 0.1, Min = 0, Max = 1, Rounding = 2,
-    Callback = function(Value) triggerRealismDelay = Value end
-})
+
+
+
+
+
 
 -- ==========================================
--- TRIGGERBOT LOGIC ENGINE (Instant Camera)
+-- SILENT AIM LOGIK & HIERARCHIE
 -- ==========================================
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local lPlayer = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+local silentAimEnabled = false
+local silentTeamCheck = true
+local silentWallCheck = false
+local silentHitChance = 100
+local silentFovEnabled = false
 
--- Ein langes Erkennungs-Rohr direkt aus deinem Fadenkreuz (300 Studs lang)
-local mousePart = Instance.new("Part")
-mousePart.Name = "SorraInstantDetector"
-mousePart.Size = Vector3.new(2.5, 2.5, 300) 
-mousePart.Transparency = 1 -- 1 = unsichtbar. Auf 0.5 setzen, um den Strahl zu sehen!
-mousePart.Anchored = true
-mousePart.CanCollide = false
-mousePart.Parent = workspace
+local silentAimPart = "Head"
+local silentFovRadius = 120
 
--- Instant-Tracking mit der Kamera-Linse
-RunService.RenderStepped:Connect(function()
-    if triggerbotEnabled then
-        mousePart.CFrame = camera.CFrame * CFrame.new(0, 0, -150)
+-- Separater FOV Kreis für Silent Aim via Drawing-API
+local silentFovCircle = Drawing.new("Circle")
+silentFovCircle.Visible = false
+silentFovCircle.Color = Color3.fromRGB(0, 150, 255) -- Blau zur Unterscheidung
+silentFovCircle.Thickness = 1
+silentFovCircle.NumSides = 64
+silentFovCircle.Radius = silentFovRadius
+silentFovCircle.Filled = false
+
+local function isSilentEnemy(targetPlayer)
+    if not silentTeamCheck then return true end
+    return targetPlayer.Team ~= player.Team
+end
+
+local function isSilentVisible(targetPart)
+    if not silentWallCheck then return true end
+    local castRay = Ray.new(camera.CFrame.Position, (targetPart.Position - camera.CFrame.Position).Unit * 1000)
+    local hit = workspace:FindPartOnRayWithIgnoreList(castRay, {player.Character, targetPart.Parent})
+    return hit == nil
+end
+
+-- Holt das beste Ziel im Silent-Aim-Radius
+local function getSilentTarget()
+    local closestPlayer = nil
+    local shortestDistance = silentFovEnabled and silentFovRadius or math.huge
+
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= player and v.Character and v.Character:FindFirstChild(silentAimPart) and v.Character:FindFirstChildOfClass("Humanoid") then
+            if v.Character.Humanoid.Health > 0 and isSilentEnemy(v) and isSilentVisible(v.Character[silentAimPart]) then
+                local pos, onScreen = camera:WorldToViewportPoint(v.Character[silentAimPart].Position)
+                if onScreen then
+                    local mousePos = Vector2.new(mouse.X, mouse.Y)
+                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = v
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- Update-Schleife für den Silent-FOV-Kreis
+runService.RenderStepped:Connect(function()
+    if silentFovEnabled then
+        silentFovCircle.Position = Vector2.new(mouse.X, mouse.Y + 36)
+        silentFovCircle.Radius = silentFovRadius
+        silentFovCircle.Visible = true
     else
-        mousePart.CFrame = CFrame.new(0, -999, 0)
-    end
-end)
-
-local lastClick = 0
-
-RunService.Heartbeat:Connect(function()
-    if not triggerbotEnabled then return end
-    
-    local character = lPlayer.Character
-    if not character or not character:FindFirstChildOfClass("Tool") then return end
-
-    local overlappingParts = workspace:GetPartsInPart(mousePart)
-    
-    for _, part in pairs(overlappingParts) do
-        local hitModel = part.Parent
-        if hitModel:IsA("Accessory") then hitModel = hitModel.Parent end
-        
-        local humanoid = hitModel:FindFirstChildOfClass("Humanoid")
-        local targetPlayer = Players:GetPlayerFromCharacter(hitModel)
-        
-        if humanoid and targetPlayer and targetPlayer ~= lPlayer then
-            if aimDeadCheck and humanoid.Health <= 0 then continue end
-            if aimTeamCheck and targetPlayer.Team == lPlayer.Team then continue end
-            
-            local now = os.clock()
-            if now - lastClick > (triggerRealismDelay + 0.005) then
-                lastClick = now
-                
-                local viewportSize = camera.ViewportSize
-                local centerX = viewportSize.X / 2
-                local centerY = viewportSize.Y / 2
-                
-                -- Klickt absolut verzögerungsfrei und fehlerfrei in der Bildschirmmitte
-                task.spawn(function()
-                    pcall(function()
-                        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, nil, 0)
-                        task.wait(0.01)
-                        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, nil, 0)
-                    end)
-                end)
-                
-                break
-            end
-        end
+        silentFovCircle.Visible = false
     end
 end)
 
 -- ==========================================
--- HITBOX EXPANDER (INFINITE YIELD BASED)
+-- METAMETHOD HOOKS (Das eigentliche Silent Aim)
 -- ==========================================
 
--- Variables für die UI-Steuerung
-local hitboxEnabled = false
-local hitboxSize = 2.5 -- Standardgröße (Roblox Standard ist ~2)
-local hitboxTransparency = 0.7 -- Wie sichtbar die erweiterte Hitbox ist
-
--- ==========================================
--- UI INTERFACE (Fügt sich in deinen Combat-Tab ein)
--- ==========================================
-MeinCombatTab:AddToggle("HitboxToggle", {
-    Title = "Hitbox Expander Aktivieren",
-    Description = "Vergrößert die Hitboxen aller Gegner.",
-    Default = false,
-    Callback = function(Value) hitboxEnabled = Value end
-})
-
-MeinCombatTab:AddSlider("HitboxSizeSlider", {
-    Title = "Hitbox Größe",
-    Description = "Standard ist 2. Empfohlen: 5 bis 15 für leichtes Treffen.",
-    Default = 2.5, Min = 2, Max = 30, Rounding = 1,
-    Callback = function(Value) hitboxSize = Value end
-})
-
-MeinCombatTab:AddSlider("HitboxTransSlider", {
-    Title = "Hitbox Sichtbarkeit",
-    Description = "0 = voll sichtbar, 1 = komplett unsichtbar.",
-    Default = 0.7, Min = 0, Max = 1, Rounding = 2,
-    Callback = function(Value) hitboxTransparency = Value end
-})
-
--- ==========================================
--- HITBOX LOGIC ENGINE
--- ==========================================
--- Läuft permanent im Hintergrund und aktualisiert die Gegner
-
-RunService.Heartbeat:Connect(function()
-    if not hitboxEnabled then return end
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        -- Nicht uns selbst verändern, und Team-Check beachten falls gewünscht
-        if player ~= lPlayer then
-            if aimTeamCheck and player.Team == lPlayer.Team then continue end
-            
-            local character = player.Character
-            if character then
-                -- Infinite Yield modifiziert standardmäßig den Kopf oder den Torso
-                -- HumanoidRootPart ist am sichersten, da es das Zentrum des Spielers ist
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                
-                -- Nur lebende Spieler vergrößern
-                if rootPart and humanoid and humanoid.Health > 0 then
-                    pcall(function()
-                        -- Größe anpassen
-                        rootPart.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                        
-                        -- Aussehen & Physikalische Eigenschaften (wie in IY)
-                        rootPart.Transparency = hitboxTransparency
-                        rootPart.Color = Color3.fromRGB(255, 0, 255) -- Lila Hitboxen (sieht man gut)
-                        rootPart.Material = Enum.Material.Neon
-                        rootPart.CanCollide = false -- Verhindert, dass Gegner durch die Map gepatched werden
-                    end)
+-- Hook 1: Für ältere/klassische Waffensysteme (mouse.Hit / mouse.Target)
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, index)
+    if silentAimEnabled and self == mouse and (index == "Hit" or index == "Target") and not checkcaller() then
+        if math.random(1, 100) <= silentHitChance then
+            local target = getSilentTarget()
+            if target and target.Character and target.Character:FindFirstChild(silentAimPart) then
+                if index == "Hit" then
+                    return target.Character[silentAimPart].CFrame
+                elseif index == "Target" then
+                    return target.Character[silentAimPart]
                 end
             end
         end
     end
+    return oldIndex(self, index)
 end)
 
--- RESET-LOGIK: Wenn der Toggle ausgeschaltet wird, alles wieder normal machen
-local function resetHitboxes()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= lPlayer then
-            local character = player.Character
-            if character then
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    pcall(function()
-                        rootPart.Size = Vector3.new(2, 2, 1) -- Roblox Standard-Größe
-                        rootPart.Transparency = 1 -- Wieder unsichtbar machen
-                        rootPart.CanCollide = false
-                    end)
-                end
+-- Hook 2: Für moderne Waffensysteme (workspace:Raycast)
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if silentAimEnabled and self == workspace and method == "Raycast" and not checkcaller() then
+        if math.random(1, 100) <= silentHitChance then
+            local target = getSilentTarget()
+            if target and target.Character and target.Character:FindFirstChild(silentAimPart) then
+                local origin = args[1]
+                local targetPos = target.Character[silentAimPart].Position
+                args[2] = (targetPos - origin).Unit * 1000 -- Richtungsvektor biegen
             end
         end
     end
-end
-
--- Überwachung für den Reset
-task.spawn(function()
-    while task.wait(0.5) do
-        if not hitboxEnabled then
-            resetHitboxes()
-        end
-    end
+    return oldNamecall(self, unpack(args))
 end)
 
 -- ==========================================
--- ADVANCED VISUALS TAB (UNIVERSAL ESP SYSTEM)
+-- FLUENT UI ELEMENTS FÜR SILENT AIM
 -- ==========================================
+local SilentSection = Tabs.Combat:AddSection("Silent Aim Settings")
 
-local MeinVisualsTab = Tabs.Visuals -- Holt sich den Tab aus deiner Tabelle
-
--- ==========================================
--- UI TOGGLES
--- ==========================================
-local chamsEnabled = false
-local boxesEnabled = false
-local namesEnabled = false
-local healthEnabled = false
-
-MeinVisualsTab:AddToggle("ChamsToggle", {
-    Title = "Team-Color Chams (Wallhack)",
-    Description = "Färbt Spieler in ihrer echten Teamfarbe durch Wände.",
+local SilentToggle = Tabs.Combat:AddToggle("SilentToggle", {
+    Title = "Enable Silent Aim",
+    Description = "Leitet Schüsse direkt im Speicher um",
     Default = false,
-    Callback = function(Value) chamsEnabled = Value end
+    Callback = function(Value) silentAimEnabled = Value end
 })
 
-MeinVisualsTab:AddToggle("BoxesToggle", {
-    Title = "2D Dynamic Boxes",
-    Description = "Zeigt Boxen, die sich der Distanz anpassen.",
-    Default = false,
-    Callback = function(Value) boxesEnabled = Value end
+local ChanceSlider = Tabs.Combat:AddSlider("ChanceSlider", {
+    Title = "Silent Hit Chance",
+    Description = "100% = Trifft immer, weniger = Verfehlt absichtlich Schüsse (Legit)",
+    Min = 1,
+    Max = 100,
+    Default = 100,
+    Rounding = 0,
+    Callback = function(Value) silentHitChance = Value end
 })
 
-MeinVisualsTab:AddToggle("NamesToggle", {
-    Title = "Namens-Anzeige",
-    Description = "Zeigt den Spielernamen über dem Charakter.",
-    Default = false,
-    Callback = function(Value) namesEnabled = Value end
+local SilentBoneDropdown = Tabs.Combat:AddDropdown("SilentBoneDropdown", {
+    Title = "Silent Target Bone",
+    Values = {"Head", "HumanoidRootPart"},
+    Default = "Head",
+    Callback = function(Value) silentAimPart = Value end
 })
 
-MeinMovementTab = MeinMovementTab or {} -- Fallback
-MeinVisualsTab:AddToggle("HealthToggle", {
-    Title = "Lebens-Anzeige",
-    Description = "Zeigt die aktuellen HP / Max HP an.",
-    Default = false,
-    Callback = function(Value) healthEnabled = Value end
+local SilentFilterSection = Tabs.Combat:AddSection("Silent Aim Filters & FOV")
+
+local SilentTeamToggle = Tabs.Combat:AddToggle("SilentTeamToggle", {
+    Title = "Silent Team Check",
+    Default = true,
+    Callback = function(Value) silentTeamCheck = Value end
 })
 
--- ==========================================
--- UTILITIES & CACHE
--- ==========================================
-local CoreGui = game:GetService("CoreGui")
-local espContainer = CoreGui:FindFirstChild("SorraESPContainer") or Instance.new("Folder")
-if not espContainer.Parent then
-    espContainer.Name = "SorraESPContainer"
-    espContainer.Parent = CoreGui
-end
+local SilentWallToggle = Tabs.Combat:AddToggle("SilentWallToggle", {
+    Title = "Silent Wall Check",
+    Default = false,
+    Callback = function(Value) silentWallCheck = Value end
+})
 
-local function getTeamColor(player)
-    if player.Team then
-        return player.TeamColor.Color
-    end
-    return Color3.fromRGB(255, 255, 255) -- Weiß, falls kein Team existiert
-end
+local SilentFovToggle = Tabs.Combat:AddToggle("SilentFovToggle", {
+    Title = "Show Silent FOV Circle",
+    Default = false,
+    Callback = function(Value) silentFovEnabled = Value end
+})
 
--- ==========================================
--- VISUALS CORE ENGINE (Handles Join, Respawn & Leave)
--- ==========================================
-local function createESPForPlayer(player)
-    if player == lPlayer then return end
+local SilentFovSlider = Tabs.Combat:AddSlider("SilentFovSlider", {
+    Title = "Silent FOV Radius",
+    Min = 10,
+    Max = 600,
+    Default = 120,
+    Rounding = 0,
+    Callback = function(Value) silentFovRadius = Value end
+})
 
-    local function setupCharacterVisuals(character)
-        local humanoid = character:WaitForChild("Humanoid", 10)
-        local rootPart = character:WaitForChild("HumanoidRootPart", 10)
-        local head = character:WaitForChild("Head", 10)
-        if not humanoid or not rootPart or not head then return end
 
-        -- 1. CHAMS (HIGHLIGHT)
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "SorraHighlight"
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.FillTransparency = 0.5
-        highlight.OutlineTransparency = 0
-        highlight.Parent = espContainer
-        highlight.Adornee = character
 
-        -- 2. BILLBOARD GUI FOR TEXTS (Name & Health)
-        local billboard = Instance.new("BillboardGui")
-        billboard.Name = "SorraBillboard"
-        billboard.Size = UDim2.new(0, 200, 0, 50)
-        billboard.AlwaysOnTop = true
-        billboard.ExtentsOffset = Vector3.new(0, 3, 0) -- Über dem Kopf
-        billboard.Parent = espContainer
-        billboard.Adornee = head
 
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(1, 0, 0, 20)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.Font = Enum.Font.SourceSansBold
-        nameLabel.TextSize = 16
-        nameLabel.TextStrokeTransparency = 0
-        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        nameLabel.Parent = billboard
 
-        local healthLabel = Instance.new("TextLabel")
-        healthLabel.Size = UDim2.new(1, 0, 0, 20)
-        healthLabel.Position = UDim2.new(0, 0, 0, 20)
-        healthLabel.BackgroundTransparency = 1
-        healthLabel.Font = Enum.Font.SourceSansBold
-        healthLabel.TextSize = 14
-        healthLabel.TextStrokeTransparency = 0
-        healthLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        healthLabel.Parent = billboard
 
-        -- 3. DRAWING 2D BOX
-        local boxOutline = Drawing.new("Square")
-        boxOutline.Thickness = 3
-        boxOutline.Filled = false
-        boxOutline.Transparency = 1
-        boxOutline.Color = Color3.fromRGB(0, 0, 0)
 
-        local box = Drawing.new("Square")
-        box.Thickness = 1
-        box.Filled = false
-        box.Transparency = 1
 
-        -- REFRESH LOOP FOR THIS SPECIFIC CHARACTER
+
+
+
+
+local hitboxExpansionEnabled = false
+local expandedHitboxSize = 2 -- Der Wert vom Slider
+local originalSizes = {} -- Speichert die Standardgrößen der Spieler-Parts
+
+local player = game.Players.LocalPlayer
+local runService = game:GetService("RunService")
+
+local function monitorHitbox(targetPlayer)
+    if targetPlayer == player then return end
+
+    local function setupCharacter(char)
+        local root = char:WaitForChild("HumanoidRootPart", 5)
+        if not root then return end
+
+        -- Sichert die Originalgröße, falls noch nicht bekannt
+        if not originalSizes[targetPlayer.Name] then
+            originalSizes[targetPlayer.Name] = root.Size
+        end
+
+        -- Kontinuierliche Überprüfung des Parts
         local connection
-        connection = RunService.RenderStepped:Connect(function()
-            -- Prüfen, ob Charakter/Spieler noch existiert und lebt
-            if not character.Parent or not humanoid.Parent or humanoid.Health <= 0 then
-                highlight:Destroy()
-                billboard:Destroy()
-                boxOutline:Destroy()
-                box:Destroy()
+        connection = runService.RenderStepped:Connect(function()
+            if not char or not char.Parent or not root or not root.Parent then
                 connection:Disconnect()
                 return
             end
 
-            local color = getTeamColor(player)
-
-            -- CHAMS LOGIC
-            if chamsEnabled then
-                highlight.Enabled = true
-                highlight.FillColor = color
-                highlight.OutlineColor = color
+            if hitboxExpansionEnabled then
+                -- Part vergrößern
+                root.Size = Vector3.new(expandedHitboxSize, expandedHitboxSize, expandedHitboxSize)
+                root.CanCollide = false -- Verhindert, dass man an den riesigen Hitboxen hängen bleibt
             else
-                highlight.Enabled = false
-            end
-
-            -- TEXTS LOGIC (Name & Health)
-            if namesEnabled then
-                nameLabel.Visible = true
-                nameLabel.Text = player.Name
-                nameLabel.TextColor3 = color
-            else
-                nameLabel.Visible = false
-            end
-
-            if healthEnabled then
-                healthLabel.Visible = true
-                local currentHp = math.floor(humanoid.Health)
-                local maxHp = math.floor(humanoid.MaxHealth)
-                healthLabel.Text = string.format("[%s / %s HP]", currentHp, maxHp)
-                
-                -- Färbt die Lebensanzeige dynamisch von Grün zu Rot
-                local hpPercent = currentHp / maxHp
-                healthLabel.TextColor3 = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), hpPercent)
-            else
-                healthLabel.Visible = false
-            end
-
-            -- DYNAMIC 2D BOX LOGIC
-            if boxesEnabled then
-                local screenPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
-                
-                if onScreen then
-                    -- Berechnet die Größe basierend auf der Entfernung zur Kamera
-                    local distance = (camera.CFrame.Position - rootPart.Position).Magnitude
-          
-                    box.Size = Vector2.new(boxWidth, boxHeight)
-                    box.Position = Vector2.new(screenPos.X - boxWidth / 2, screenPos.Y - boxHeight / 2)
-                    box.Color = color
-                    box.Visible = true
-
-                    boxOutline.Size = box.Size
-                    boxOutline.Position = box.Position
-                    boxOutline.Visible = true
-                else
-                    box.Visible = false
-                    boxOutline.Visible = false
+                -- Wieder in den Originalzustand zurückversetzen
+                if originalSizes[targetPlayer.Name] then
+                    root.Size = originalSizes[targetPlayer.Name]
+                    root.CanCollide = true
                 end
-            else
-                box.Visible = false
-                boxOutline.Visible = false
             end
         end)
     end
 
-    -- Erkennt Respawns automatisch
-    if player.Character then
-        task.spawn(setupCharacterVisuals, player.Character)
+    if targetPlayer.Character then
+        task.spawn(setupCharacter, targetPlayer.Character)
     end
-    player.CharacterAdded:Connect(function(char)
-        task.spawn(setupCharacterVisuals, char)
+    targetPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        setupCharacter(char)
     end)
 end
 
--- Initiale Aktivierung für alle Spieler auf dem Server
-for _, player in pairs(Players:GetPlayers()) do
-    createESPForPlayer(player)
+-- Registrierung für alle Spieler auf dem Server
+for _, p in pairs(game.Players:GetPlayers()) do
+    monitorHitbox(p)
 end
 
--- Hook für neue Spieler, die dem Server beitreten
-Players.PlayerAdded:Connect(createESPForPlayer)
+game.Players.PlayerAdded:Connect(monitorHitbox)
 
--- ==========================================
--- PLAYER VISUALS (SAFE FULLBRIGHT WITH INTENSITY & ANTI-RESET)
--- ==========================================
+local ExpanderSection = Tabs.Combat:AddSection("Hitbox Expander")
 
-local MeinPlayerTab = Tabs.Visuals -- Nutzt deinen Visuals-Tab
-
-local Lighting = game:GetService("Lighting")
-local fullbrightEnabled = false
-local fullbrightBrightness = 10 -- Standardwert für den Slider
-
--- Speicher für die originalen Spiel-Lichteinstellungen
-local originalLighting = {
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    Brightness = Lighting.Brightness,
-    ClockTime = Lighting.ClockTime,
-    FogEnd = Lighting.FogEnd,
-    GlobalShadows = Lighting.GlobalShadows
-}
-
-local function saveOriginalLighting()
-    if not fullbrightEnabled then
-        originalLighting.Ambient = Lighting.Ambient
-        originalLighting.OutdoorAmbient = Lighting.OutdoorAmbient
-        originalLighting.Brightness = Lighting.Brightness
-        originalLighting.ClockTime = Lighting.ClockTime
-        originalLighting.FogEnd = Lighting.FogEnd
-        originalLighting.GlobalShadows = Lighting.GlobalShadows
-    end
-end
-
--- Hilfsfunktion, die die Helligkeit erzwingt
-local function enforceFullbright()
-    if not fullbrightEnabled then return end
-    pcall(function()
-        local colorValue = math.clamp(fullbrightBrightness * 25.5, 0, 255)
-        local customAmbient = Color3.fromRGB(colorValue, colorValue, colorValue)
-        
-        Lighting.Ambient = customAmbient
-        Lighting.OutdoorAmbient = customAmbient
-        Lighting.Brightness = fullbrightBrightness
-        Lighting.FogEnd = 999999
-        Lighting.GlobalShadows = (fullbrightBrightness == 0)
-    end)
-end
-
--- ==========================================
--- UI INTERFACE
--- ==========================================
-MeinPlayerTab:AddToggle("FullbrightToggle", {
-    Title = "Custom Brightness Aktivieren",
-    Description = "Schaltet die benutzerdefinierte Helligkeit ein.",
+-- Toggle für Aktivierung
+local ExpanderToggle = Tabs.Combat:AddToggle("ExpanderToggle", {
+    Title = "Enable Hitbox Expansion",
+    Description = "Vergrößert das physische Zentrum (HumanoidRootPart) der Spieler",
     Default = false,
     Callback = function(Value)
-        fullbrightEnabled = Value
-        
-        if fullbrightEnabled then
-            saveOriginalLighting()
-            enforceFullbright() -- Sofort beim Einschalten anwenden
-        else
-            -- Reset auf exakte Originalwerte
-            pcall(function()
-                Lighting.Ambient = originalLighting.Ambient
-                Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
-                Lighting.Brightness = originalLighting.Brightness
-                Lighting.ClockTime = originalLighting.ClockTime
-                Lighting.FogEnd = originalLighting.FogEnd
-                Lighting.GlobalShadows = originalLighting.GlobalShadows
-            end)
-        end
+        hitboxExpansionEnabled = Value
     end
 })
 
-MeinPlayerTab:AddSlider("BrightnessSlider", {
-    Title = "Helligkeits-Stärke",
-    Description = "0 = Stockdunkel, 1 = Normal, 10 = Hell, 40 = Sonneneruption.",
-    Default = 10, Min = 0, Max = 40, Rounding = 1,
+-- Slider für die Part-Größe
+local ExpanderSlider = Tabs.Combat:AddSlider("ExpanderSlider", {
+    Title = "Expansion Size",
+    Description = "Bestimmt, wie groß die Parts skaliert werden",
+    Min = 2,
+    Max = 20,
+    Default = 2,
+    Rounding = 1,
     Callback = function(Value)
-        fullbrightBrightness = Value
-        if fullbrightEnabled then enforceFullbright() end
+        expandedHitboxSize = Value
     end
 })
 
--- ==========================================
--- ANTI-RESET ENGINE (Doppelter Schutz)
--- ==========================================
 
--- 1. Schutz: Frame-genaues Erzwingen (falls das Spiel Werte schleichend ändert)
-RunService.RenderStepped:Connect(function()
-    if fullbrightEnabled then
-        enforceFullbright()
-    end
-end)
 
--- 2. Schutz: Event-basiertes Blocken (falls das Spiel die Werte hart zurücksetzt)
-Lighting.Changed:Connect(function(property)
-    if fullbrightEnabled then
-        -- Wenn das Spiel versucht, Werte zu ändern während Fullbright AN ist -> Direkt wieder überschreiben
-        enforceFullbright()
-    else
-        -- Wenn Fullbright AUS ist, speichern wir normale Map-Wechsel/Tageszeiten ab
-        pcall(function()
-            if originalLighting[property] ~= nil then
-                originalLighting[property] = Lighting[property]
-            end
-        end)
-    end
-end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- ==========================================
--- MISC TAB (UNIVERSAL FOV CHANGER)
+-- VISUALS / ESP LOGIK-VARIABLEN (FIXED OFFSET)
 -- ==========================================
+local espMainEnabled = false
+local espTeamCheck = false
+local espTracersEnabled = false
+local espBoxesEnabled = false
+local espHealthEnabled = false
+local espNamesEnabled = false
+local espHighlightEnabled = false
 
-local MeinMiscTab = Tabs.Misc -- Holt sich den Tab aus deiner Tabelle
-
+local player = game.Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local fovEnabled = false
-local customFovValue = 90 -- Standardwert für den Slider
+local runService = game:GetService("RunService")
+local guiService = game:GetService("GuiService") -- Wichtig für den TopBar-Offset
+local pGui = player:WaitForChild("PlayerGui")
 
--- Speicher für das originale FOV des Spiels
-local originalFOV = camera.FieldOfView
+local espScreenGui = Instance.new("ScreenGui")
+espScreenGui.Name = "CookieESP_Screen"
+espScreenGui.ResetOnSpawn = false
+espScreenGui.Parent = pGui
 
--- Falls das Spiel die Kamera mitten im Match neu lädt, sichern wir das ab
-camera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
-    if not fovEnabled then
-        originalFOV = camera.FieldOfView
-    end
-end)
+local function createESPForPlayer(targetPlayer)
+    if targetPlayer == player then return end
 
--- ==========================================
--- UI INTERFACE
--- ==========================================
-MeinMiscTab:AddSection("Camera Modifications")
+    local function setupCharacter(char)
+        local root = char:WaitForChild("HumanoidRootPart", 5)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if not root or not hum then return end
 
-MeinMiscTab:AddToggle("FovToggle", {
-    Title = "Custom FOV Aktivieren",
-    Description = "Schaltet dein benutzerdefiniertes Sichtfeld ein.",
-    Default = false,
-    Callback = function(Value)
-        fovEnabled = Value
-        
-        if fovEnabled then
-            -- Erst Originalwert merken, dann anwenden
-            originalFOV = camera.FieldOfView
-            camera.FieldOfView = customFovValue
-        else
-            -- Sicher zurücksetzen auf den exakten alten Wert
-            camera.FieldOfView = originalFOV
+        local bGui = char:FindFirstChild("ESPElements") or Instance.new("BillboardGui")
+        bGui.Name = "ESPElements"
+        bGui.Size = UDim2.new(0, 200, 0, 100)
+        bGui.AlwaysOnTop = true
+        bGui.StudsOffset = Vector3.new(0, 3.5, 0)
+        bGui.Adornee = root
+        bGui.Parent = root
+
+        local infoLabel = bGui:FindFirstChild("Info") or Instance.new("TextLabel")
+        infoLabel.Name = "Info"
+        infoLabel.Size = UDim2.new(1, 0, 1, 0)
+        infoLabel.BackgroundTransparency = 1
+        infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        infoLabel.TextSize = 13
+        infoLabel.Font = Enum.Font.SourceSansBold
+        infoLabel.TextStrokeTransparency = 0
+        infoLabel.Parent = bGui
+
+        local highlight = char:FindFirstChild("ESPHighlight") or Instance.new("Highlight")
+        highlight.Name = "ESPHighlight"
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = char
+        highlight.Parent = char
+
+        local boxFrame = espScreenGui:FindFirstChild("Box_" .. targetPlayer.Name) or Instance.new("Frame")
+        if not espScreenGui:FindFirstChild("Box_" .. targetPlayer.Name) then
+            boxFrame.Name = "Box_" .. targetPlayer.Name
+            boxFrame.BackgroundTransparency = 1
+            boxFrame.Parent = espScreenGui
+            local stroke = Instance.new("UIStroke")
+            stroke.Thickness = 2
+            stroke.Parent = boxFrame
         end
-    end
-})
 
-MeinMiscTab:AddSlider("FovSlider", {
-    Title = "FOV Stärke",
-    Description = "Standard ist meistens 70. Empfohlen: 90 bis 110.",
-    Default = 90, Min = 30, Max = 120, Rounding = 1,
-    Callback = function(Value)
-        customFovValue = Value
-        
-        -- Wenn der Toggle aktiv ist, die Änderung sofort live anzeigen
-        if fovEnabled then
-            camera.FieldOfView = customFovValue
+        local healthBar = boxFrame:FindFirstChild("HealthBar") or Instance.new("Frame")
+        if not boxFrame:FindFirstChild("HealthBar") then
+            healthBar.Name = "HealthBar"
+            healthBar.BorderSizePixel = 0
+            healthBar.Parent = boxFrame
         end
-    end
-})
 
--- ==========================================
--- ANTI-RESET ENGINE FOR CAMERA
--- ==========================================
--- Verhindert, dass das Spiel dein FOV beim Sprinten oder Respawnen überschreibt
-RunService.RenderStepped:Connect(function()
-    if fovEnabled and camera.FieldOfView ~= customFovValue then
-        camera.FieldOfView = customFovValue
-    end
-end)
-
--- ==========================================
--- MISC TAB (UNIVERSAL ANTI-AFK SYSTEM)
--- ==========================================
-
--- Variables
-local antiAfkEnabled = false
-local antiAfkMode = "Virtual Input" -- Standard-Modus
-local afkTimer = 0
-
--- Services
-local VirtualUser = game:GetService("VirtualUser")
-local playersService = game:GetService("Players")
-
--- ==========================================
--- UI INTERFACE
--- ==========================================
-MeinMiscTab:AddSection("Anti-AFK System")
-
-MeinMiscTab:AddToggle("AntiAfkToggle", {
-    Title = "Anti-AFK Aktivieren",
-    Description = "Verhindert den 20-Minuten-Kick von Roblox.",
-    Default = false,
-    Callback = function(Value)
-        antiAfkEnabled = Value
-        afkTimer = 0 -- Reset den Timer beim Umschalten
-    end
-})
-
-MeinMiscTab:AddDropdown("AntiAfkModeDropdown", {
-    Title = "Anti-AFK Modus",
-    Description = "Wähle die Methode, um aktiv zu bleiben.",
-    Values = {"Virtual Input", "Jump Physics"},
-    Default = "Virtual Input",
-    Callback = function(Value)
-        antiAfkMode = Value
-    end
-})
-
--- ==========================================
--- ANTI-AFK CORE ENGINE
--- ==========================================
-
--- Methode 1: Der offizielle Roblox Core-Bypass (Fängt die IDLE-Kick-Meldung direkt ab)
--- Das läuft permanent im Hintergrund, sobald der Script geladen ist, als extra Schutzschicht.
-pcall(function()
-    lPlayer.Idled:Connect(function()
-        if antiAfkEnabled then
-            VirtualUser:Button2Down(Vector2.new(0,0), camera.CFrame)
-            task.wait(1)
-            VirtualUser:Button2Up(Vector2.new(0,0), camera.CFrame)
+        local tracerLine = espScreenGui:FindFirstChild("Tracer_" .. targetPlayer.Name) or Instance.new("Frame")
+        if not espScreenGui:FindFirstChild("Tracer_" .. targetPlayer.Name) then
+            tracerLine.Name = "Tracer_" .. targetPlayer.Name
+            tracerLine.BorderSizePixel = 0
+            tracerLine.AnchorPoint = Vector2.new(0.5, 0.5)
+            tracerLine.Parent = espScreenGui
         end
-    end)
-end)
 
--- Methode 2: Live-Loop für die ausgewählten Charakter-Modi
-RunService.Heartbeat:Connect(function(deltaTime)
-    if not antiAfkEnabled then return end
-    
-    afkTimer = afkTimer + deltaTime
-    
-    -- Führt alle 15 Sekunden eine Aktion aus, um den Server-Timeout zu resetten
-    if afkTimer >= 15 then
-        afkTimer = 0
-        
-        local character = lPlayer.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        
-        if antiAfkMode == "Virtual Input" then
-            -- Simuliert eine unschädliche Mausbewegung im Roblox-Fenster
-            pcall(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new(1, 1))
-            end)
-            
-        elseif antiAfkMode == "Jump Physics" and humanoid then
-            -- Lässt den Charakter kurz springen, falls er am Boden steht
-            pcall(function()
-                if humanoid.FloorMaterial ~= Enum.Material.Air then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        local connection
+        connection = runService.RenderStepped:Connect(function()
+            if not targetPlayer or not targetPlayer.Parent or not char or not char.Parent or hum.Health <= 0 then
+                boxFrame.Visible = false
+                tracerLine.Visible = false
+                highlight.Enabled = false
+                bGui.Enabled = false
+                connection:Disconnect()
+                return
+            end
+
+            if not espMainEnabled then
+                boxFrame.Visible = false
+                tracerLine.Visible = false
+                highlight.Enabled = false
+                bGui.Enabled = false
+                return
+            end
+
+            local isTeamMate = (targetPlayer.Team == player.Team and game.Teams:FindFirstChild(tostring(player.Team)) ~= nil)
+            if espTeamCheck and isTeamMate then
+                boxFrame.Visible = false
+                tracerLine.Visible = false
+                highlight.Enabled = false
+                bGui.Enabled = false
+                return
+            end
+
+            local currentESPColor = Color3.fromRGB(255, 0, 75)
+            if targetPlayer.Team and not espTeamCheck then
+                currentESPColor = targetPlayer.TeamColor.Color
+            end
+
+            highlight.Enabled = espHighlightEnabled
+            highlight.FillColor = currentESPColor
+
+            -- ERMITTLUNG DES AKTUELLEN INSET-OFFSETS (Verhindert das Rutschen nach unten)
+            local topBarOffset = guiService:GetGuiInset().Y
+
+            local rootPos3D, onScreen = camera:WorldToViewportPoint(root.Position)
+
+            if onScreen then
+                -- Korrigierte 2D-Position des Zentrums
+                local rootPos = Vector2.new(rootPos3D.X, rootPos3D.Y - topBarOffset)
+
+                local textStr = ""
+                if espNamesEnabled then textStr = textStr .. targetPlayer.Name .. "\n" end
+                if espHealthEnabled then textStr = textStr .. math.floor(hum.Health) .. " HP" end
+                infoLabel.Text = textStr
+                bGui.Enabled = (textStr ~= "")
+
+                if espBoxesEnabled then
+                    -- Höhenberechnung unter Einbeziehung des Offsets
+                    local top3D = camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0))
+                    local bottom3D = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.5, 0))
+                    
+                    local topY = top3D.Y - topBarOffset
+                    local bottomY = bottom3D.Y - topBarOffset
+                    
+                    local height = math.abs(topY - bottomY)
+                    local width = height / 1.4
+
+                    boxFrame.Size = UDim2.new(0, width, 0, height)
+                    boxFrame.Position = UDim2.new(0, rootPos.X - width / 2, 0, topY)
+                    
+                    if boxFrame:FindFirstChildOfClass("UIStroke") then
+                        boxFrame:FindFirstChildOfClass("UIStroke").Color = currentESPColor
+                    end
+                    boxFrame.Visible = true
+
+                    local healthPercent = hum.Health / hum.MaxHealth
+                    healthBar.Size = UDim2.new(0, 3, healthPercent, 0)
+                    healthBar.Position = UDim2.new(0, -6, 1 - healthPercent, 0)
+                    healthBar.BackgroundColor3 = Color3.fromHSV(healthPercent * 0.3, 1, 1)
+                    healthBar.Visible = true
+                else
+                    boxFrame.Visible = false
                 end
-            end)
-        end
+
+                if espTracersEnabled then
+                    -- Tracer startet unten in der Mitte des korrigierten Viewports
+                    local startPos = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y - topBarOffset)
+                    local endPos = rootPos
+                    local distance = (endPos - startPos).Magnitude
+
+                    tracerLine.Size = UDim2.new(0, distance, 0, 1)
+                    tracerLine.Position = UDim2.new(0, (startPos.X + endPos.X) / 2, 0, (startPos.Y + endPos.Y) / 2)
+                    tracerLine.Rotation = math.deg(math.atan2(endPos.Y - startPos.Y, endPos.X - startPos.X))
+                    tracerLine.BackgroundColor3 = currentESPColor
+                    tracerLine.Visible = true
+                else
+                    tracerLine.Visible = false
+                end
+            else
+                boxFrame.Visible = false
+                tracerLine.Visible = false
+                bGui.Enabled = false
+            end
+        end)
     end
-end)
+
+    if targetPlayer.Character then
+        task.spawn(setupCharacter, targetPlayer.Character)
+    end
+    targetPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        setupCharacter(char)
+    end)
+end
+
+function watchESPPlayer(p)
+    if p ~= player then
+        if p.Character then task.spawn(createESPForPlayer, p) end
+        p.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            task.spawn(createESPForPlayer, p)
+        end)
+    end
+end
+
+for _, p in pairs(game.Players:GetPlayers()) do watchESPPlayer(p) end
+game.Players.PlayerAdded:Connect(watchESPPlayer)
 
 -- ==========================================
--- MISC TAB (UNIVERSAL PERFORMANCE BOOSTER)
+-- FLUENT UI ELEMENTS (FÜR DEN VISUALS TAB)
 -- ==========================================
+local MainEspSection = Tabs.Visuals:AddSection("ESP Hauptschalter")
 
--- Variables
-local perfBoostEnabled = false
-local selectedOptions = {}
+local MainEspToggle = Tabs.Visuals:AddToggle("MainEspToggle", {
+    Title = "Enable ESP System",
+    Description = "Schaltet das gesamte ESP-System ein oder aus",
+    Default = false,
+    Callback = function(Value) espMainEnabled = Value end
+})
 
--- Speicher für originale Zustände, um alles perfekt rückgängig zu machen
-local terrain = workspace:FindFirstChildOfClass("Terrain")
-local Lighting = game:GetService("Lighting")
+local FilterEspSection = Tabs.Visuals:AddSection("ESP Filter & Farben")
 
-local originalStates = {
-    Materials = {},
-    Reflectance = {},
-    GlobalShadows = Lighting.GlobalShadows,
-    WaterWaveSize = terrain and terrain.WaterWaveSize or 0.1,
-    WaterWaveSpeed = terrain and terrain.WaterWaveSpeed or 10,
-    WaterTransparency = terrain and terrain.WaterTransparency or 1
+local TeamCheckToggle = Tabs.Visuals:AddToggle("TeamCheckToggle", {
+    Title = "Team Check (Only Enemies)",
+    Description = "Wenn AN: Blendet dein eigenes Team komplett aus",
+    Default = false,
+    Callback = function(Value) espTeamCheck = Value end
+})
+
+local ElementsEspSection = Tabs.Visuals:AddSection("ESP Elemente")
+
+local BoxToggle = Tabs.Visuals:AddToggle("BoxToggle", {
+    Title = "Show Dynamic Boxes & Healthbar",
+    Description = "Zeigt eine dünne Box um Spieler inklusive Lebensbalken",
+    Default = false,
+    Callback = function(Value) espBoxesEnabled = Value end
+})
+
+local HighlightToggle = Tabs.Visuals:AddToggle("HighlightToggle", {
+    Title = "Show Highlights (Chams)",
+    Description = "Füllt den Körper des Spielers mit einer sichtbaren Farbe aus",
+    Default = false,
+    Callback = function(Value) espHighlightEnabled = Value end
+})
+
+local TracerToggle = Tabs.Visuals:AddToggle("TracerToggle", {
+    Title = "Show Tracers (Sichtlinien)",
+    Description = "Zeigt Linien vom unteren Bildschirmrand zu den Spielern",
+    Default = false,
+    Callback = function(Value) espTracersEnabled = Value end
+})
+
+local NameToggle = Tabs.Visuals:AddToggle("NameToggle", {
+    Title = "Show Names",
+    Description = "Zeigt den Namen des Spielers über dem Kopf an",
+    Default = false,
+    Callback = function(Value) espNamesEnabled = Value end
+})
+
+local HealthToggle = Tabs.Visuals:AddToggle("HealthToggle", {
+    Title = "Show Health Text",
+    Description = "Zeigt das aktuelle Leben als Zahl über dem Kopf an",
+    Default = false,
+    Callback = function(Value) espHealthEnabled = Value end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- DEV-TAB LOGIK & VARIABLEN
+-- ==========================================
+selectedTools = {
+    ["Infinite Yield"] = false,
+    ["Dark Dex"] = false,
+    ["SimpleSpy"] = false,
+    ["Hydroxide"] = false
 }
 
--- Hilfsfunktion: Optimiert ein einzelnes Objekt basierend auf den Optionen
-local function optimizeObject(obj)
-    if not perfBoostEnabled then return end
-    
-    pcall(function()
-        -- 1. Texturen & Decals
-        if selectedOptions["Textures & Decals"] and (obj:IsA("Texture") or obj:IsA("Decal")) then
-            obj.Transparency = 1
-        
-        -- 2. Materialien zu Smooth Plastic
-        elseif selectedOptions["Smooth Materials"] and (obj:IsA("Part") or obj:IsA("MeshPart") or obj:IsA("CornerWedgePart") or obj:IsA("TrussPart")) then
-            if not originalStates.Materials[obj] then
-                originalStates.Materials[obj] = obj.Material
-            end
-            obj.Material = Enum.Material.SmoothPlastic
-            
-        -- 3. Spiegelungen & Glanz entfernen
-        elseif selectedOptions["Remove Reflections"] and obj:IsA("BasePart") then
-            if not originalStates.Reflectance[obj] then
-                originalStates.Reflectance[obj] = obj.Reflectance
-            end
-            obj.Reflectance = 0
-            
-        -- 4. Partikel-Effekte unsichtbar machen
-        elseif selectedOptions["Disable Particles"] and (obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles")) then
-            obj.Enabled = false
-            
-        -- 5. Lichter / Schattenwurf deaktivieren
-        elseif selectedOptions["Disable In-Game Lights"] and (obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight")) then
-            obj.Enabled = false
-        end
-    end)
-end
+coordsEnabled = false
+performanceMode = false
 
--- Funktion zum kompletten Zurücksetzen aller Änderungen
-local function resetPerformance()
-    pcall(function()
-        -- Materialien wiederherstellen
-        for obj, mat in pairs(originalStates.Materials) do
-            if obj and obj.Parent then obj.Material = mat end
-        end
-        table.clear(originalStates.Materials)
-        
-        -- Spiegelungen wiederherstellen
-        for obj, ref in pairs(originalStates.Reflectance) do
-            if obj and obj.Parent then obj.Reflectance = ref end
-        end
-        table.clear(originalStates.Reflectance)
-        
-        -- Texturen, Partikel, Lichter wieder einschalten
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("Texture") or obj:IsA("Decal") then
-                obj.Transparency = 0
-            elseif obj:IsA("ParticleEmitter") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-                obj.Enabled = true
-            elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-                obj.Enabled = true
-            end
-        end
-        
-        -- Schatten und Wasser zurücksetzen
-        Lighting.GlobalShadows = originalStates.GlobalShadows
-        if terrain then
-            terrain.WaterWaveSize = originalStates.WaterWaveSize
-            terrain.WaterWaveSpeed = originalStates.WaterWaveSpeed
-            terrain.WaterTransparency = originalStates.WaterTransparency
-        end
-    end)
-end
+player = game.Players.LocalPlayer
+runService = game:GetService("RunService")
+pGui = player:WaitForChild("PlayerGui")
 
--- Wendet die Optimierung auf die gesamte Welt an
-local function applyPerformanceBoost()
-    if not perfBoostEnabled then return end
-    
-    pcall(function()
-        -- Globale Schatten ausschalten (massiver FPS Boost!)
-        if selectedOptions["Disable Shadows"] then
-            Lighting.GlobalShadows = false
-        end
-        
-        -- Wasser-Physik einfrieren
-        if terrain and selectedOptions["Low Water Quality"] then
-            terrain.WaterWaveSize = 0
-            terrain.WaterWaveSpeed = 0
-            terrain.WaterTransparency = 0
-        end
-        
-        -- Alle bestehenden Objekte scannen
-        for _, obj in pairs(workspace:GetDescendants()) do
-            optimizeObject(obj)
-        end
-    end)
-end
+-- 1. KORDINATEN GUI ERSTELLEN
+local coordsScreenGui = Instance.new("ScreenGui")
+coordsScreenGui.Name = "CookieDev_Coords"
+coordsScreenGui.ResetOnSpawn = false
+coordsScreenGui.Parent = pGui
 
--- ==========================================
--- UI INTERFACE (Fluent Multi-Dropdown)
--- ==========================================
-MeinMiscTab:AddSection("Performance Booster")
+local coordsLabel = Instance.new("TextLabel")
+coordsLabel.Size = UDim2.new(0, 250, 0, 30)
+coordsLabel.Position = UDim2.new(0, 20, 1, -50) -- Links unten am Bildschirmrand
+coordsLabel.BackgroundTransparency = 0.5
+coordsLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+coordsLabel.TextColor3 = Color3.fromRGB(0, 255, 150) -- Schönes Dev-Grün
+coordsLabel.TextSize = 14
+coordsLabel.Font = Enum.Font.Code
+coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
+coordsLabel.Text = " X: 0 | Y: 0 | Z: 0"
+coordsLabel.Visible = false
+coordsLabel.Parent = coordsScreenGui
 
-local PerfDropdown = MeinMiscTab:AddDropdown("PerformanceMultiSelect", {
-    Title = "Optimierungs-Optionen",
-    Description = "Wähle aus, was deaktiviert werden soll.",
-    Values = {
-        "Textures & Decals", 
-        "Smooth Materials", 
-        "Remove Reflections", 
-        "Disable Particles", 
-        "Disable In-Game Lights",
-        "Disable Shadows",
-        "Low Water Quality"
-    },
-    Multi = true,
-    Default = {},
-    Callback = function(Value)
-        selectedOptions = Value
-        if perfBoostEnabled then
-            applyPerformanceBoost()
-        end
-    end
-})
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(50, 50, 50)
+stroke.Thickness = 1
+stroke.Parent = coordsLabel
 
-MeinMiscTab:AddToggle("PerformanceToggle", {
-    Title = "Performance Booster Aktivieren",
-    Description = "Erzwingt die gewählten Optimierungen frame-genau.",
-    Default = false,
-    Callback = function(Value)
-        perfBoostEnabled = Value
-        
-        if perfBoostEnabled then
-            applyPerformanceBoost()
-        else
-            resetPerformance()
-        end
-    end
-})
-
--- ==========================================
--- ANTI-RESET ENGINE FOR PERFORMANCE
--- ==========================================
-workspace.DescendantAdded:Connect(function(descendant)
-    if perfBoostEnabled then
-        task.wait()
-        optimizeObject(descendant)
+-- Live-Update für Koordinaten
+runService.RenderStepped:Connect(function()
+    if coordsEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local root = player.Character.HumanoidRootPart
+        local pos = root.Position
+        coordsLabel.Text = string.format(" X: %.2f | Y: %.2f | Z: %.2f", pos.X, pos.Y, pos.Z)
+        coordsLabel.Visible = true
+    else
+        coordsLabel.Visible = false
     end
 end)
 
 -- ==========================================
--- WAYPOINT TELEPORT SYSTEM
+-- FLUENT UI ELEMENTS (DEV TAB)
 -- ==========================================
+ToolsSection = Tabs.Dev:AddSection("External Developer Tools")
 
-local MeinTeleportTab = Tabs.Teleport -- Oder Tabs.Player, je nachdem wo du es willst
-
-local TeleportService = game:GetService("TeleportService")
-local savedWaypoints = {}
-local selectedWaypoint = nil
-local waypointNameInput = "Wegpunkt 1"
-
--- Hilfsfunktion: Aktualisiert die Liste im Dropdown live
-local WaypointDropdown
-
-local function updateWaypointDropdown()
-    local names = {}
-    for name, _ in pairs(savedWaypoints) do
-        table.insert(names, name)
-    end
-    -- Falls die Liste leer ist, zeigen wir einen Platzhalter
-    if #names == 0 then names = {"Keine Wegpunkte"} end
-    
-    if WaypointDropdown then
-        WaypointDropdown:SetValues(names)
-        WaypointDropdown:SetValue(names[1])
-    end
-end
-
--- ==========================================
--- UI INTERFACE
--- ==========================================
-MeinTeleportTab:AddSection("Waypoint Teleporter")
-
--- 1. Name für den Wegpunkt eingeben
-MeinTeleportTab:AddInput("WaypointName", {
-    Title = "Wegpunkt Name",
-    Default = "Base",
-    Placeholder = "Name eingeben...",
-    Numeric = false,
-    Finished = true,
-    Callback = function(Value)
-        waypointNameInput = Value
-    end
+-- Toggles für die Tools
+IYToggle = Tabs.Dev:AddToggle("IYToggle", {
+    Title = "Select Infinite Yield",
+    Default = false,
+    Callback = function(Value) selectedTools["Infinite Yield"] = Value end
 })
 
--- 2. Aktuelle Position speichern
-MeinTeleportTab:AddButton({
-    Title = "Position Speichern",
-    Description = "Speichert deine aktuelle Position im Skript.",
+DexToggle = Tabs.Dev:AddToggle("DexToggle", {
+    Title = "Select Dark Dex",
+    Default = false,
+    Callback = function(Value) selectedTools["Dark Dex"] = Value end
+})
+
+SpyToggle = Tabs.Dev:AddToggle("SpyToggle", {
+    Title = "Select SimpleSpy",
+    Default = false,
+    Callback = function(Value) selectedTools["SimpleSpy"] = Value end
+})
+
+HydroToggle = Tabs.Dev:AddToggle("HydroToggle", {
+    Title = "Select Hydroxide (Dyoxide)",
+    Default = false,
+    Callback = function(Value) selectedTools["Hydroxide"] = Value end
+})
+
+-- Der korrigierte Haupt-Button zum Ausführen deiner Auswahl
+LoadToolsButton = Tabs.Dev:AddButton({
+    Title = "Load Selected Tools",
+    Description = "Führt alle oben ausgewählten Skripte aus",
     Callback = function()
-        local character = lPlayer.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        
-        if rootPart and waypointNameInput and waypointNameInput ~= "" then
-            -- Speichert die exakte CFrame (Position + Blickrichtung)
-            savedWaypoints[waypointNameInput] = rootPart.CFrame
-            updateWaypointDropdown()
+        if selectedTools["Infinite Yield"] then
+            task.spawn(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+            end)
         end
-    end
-})
-
--- 3. Dropdown zur Auswahl des Wegpunkts
-WaypointDropdown = MeinTeleportTab:AddDropdown("WaypointSelect", {
-    Title = "Wegpunkt Auswählen",
-    Description = "Wähle einen gespeicherten Ort aus.",
-    Values = {"Keine Wegpunkte"},
-    Default = "Keine Wegpunkte",
-    Callback = function(Value)
-        if Value and Value ~= "Keine Wegpunkte" then
-            selectedWaypoint = Value
-        else
-            selectedWaypoint = nil
+        if selectedTools["Dark Dex"] then
+            task.spawn(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+            end)
         end
-    end
-})
-
--- 4. Der eigentliche Teleport-Knopf
-MeinTeleportTab:AddButton({
-    Title = "Teleportieren",
-    Description = "Teleportiert dich zum ausgewählten Wegpunkt.",
-    Callback = function()
-        if not selectedWaypoint or not savedWaypoints[selectedWaypoint] then return end
-        
-        local character = lPlayer.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        
-        if rootPart then
-            pcall(function()
-                -- Sicherer Teleport über CFrame
-                rootPart.CFrame = savedWaypoints[selectedWaypoint]
+        -- Fallback: Nutzt die hochkompatible Version über Cobalt / Universal-Hubs
+        if selectedTools["SimpleSpy"] then
+            task.spawn(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3.lua"))()
+            end)
+        end
+        if selectedTools["Hydroxide"] then
+            task.spawn(function()
+                -- Cobalt Hub als extrem stabiler All-in-One-Ersatz für Dev-Tools
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/0x837/Cobalt/main/Source.lua"))()
             end)
         end
     end
 })
 
--- ==========================================
--- SERVER TAB (MANAGEMENT & LIVE INFO)
--- ==========================================
+TrackSection = Tabs.Dev:AddSection("Coordinates Tracker")
 
--- SCHUTZ: Holt sich den Server-Tab, egal ob er "Server", "ServerTab" oder "server" heißt
-local MeinServerTab = Tabs.Server or Tabs.ServerTab or Tabs.server or server
+CoordsToggle = Tabs.Dev:AddToggle("CoordsToggle", {
+    Title = "Show Screen Coordinates",
+    Description = "Blendet deine Live-Position am Bildschirmrand ein",
+    Default = false,
+    Callback = function(Value) coordsEnabled = Value end
+})
 
--- Falls er immer noch nicht gefunden wird, sucht das Skript nach einem Tab mit passendem Namen
-if not MeinServerTab then
-    for _, tab in pairs(Tabs) do
-        if type(tab) == "table" and tab.AddButton then
-            MeinServerTab = tab
-            break
+-- ==========================================
+-- BONUS DEV FEATURES (DIE DREI EXTRA FEATURES)
+-- ==========================================
+ExtraDevSection = Tabs.Dev:AddSection("Useful Dev Utilities")
+
+-- Feature 1: Copy Position CFrame
+CopyPosButton = Tabs.Dev:AddButton({
+    Title = "Copy Position Vector3",
+    Description = "Kopiert deine exakte Position in die Zwischenablage",
+    Callback = function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local pos = player.Character.HumanoidRootPart.Position
+            local formatted = string.format("Vector3.new(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z)
+            setclipboard(formatted)
+            Fluent:Notify({
+                Title = "Dev Tool",
+                Content = "Position erfolgreich kopiert!",
+                Duration = 3
+            })
         end
     end
+})
+
+-- Feature 2: Anti-Lag / Performance Mode Toggle
+LagToggle = Tabs.Dev:AddToggle("LagToggle", {
+    Title = "Performance Mode (Anti-Lag)",
+    Description = "Deaktiviert Schatten und Texturen für maximale FPS beim Testen",
+    Default = false,
+    Callback = function(Value)
+        performanceMode = Value
+        local lighting = game:GetService("Lighting")
+        
+        if performanceMode then
+            lighting.GlobalShadows = false
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("Part") or v:IsA("MeshPart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 1
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                    v.Enabled = false
+                end
+            end
+        else
+            lighting.GlobalShadows = true
+            -- Normalzustand wird beim Map-Laden oder Resetten automatisch wiederhergestellt
+        end
+    end
+})
+
+-- Feature 3: Quick Rejoin Server Button
+RejoinButton = Tabs.Dev:AddButton({
+    Title = "Quick Rejoin Server",
+    Description = "Verbindet dich sofort neu mit diesem Server",
+    Callback = function()
+        local ts = game:GetService("TeleportService")
+        local placeId = game.PlaceId
+        local jobId = game.JobId
+        ts:TeleportToPlaceInstance(placeId, jobId, player)
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- TELEPORT & PLAYER TP LOGIK-VARIABLEN
+-- ==========================================
+manualX, manualY, manualZ = 0, 0, 0
+selectedTargetPlayer = ""
+
+player = game.Players.LocalPlayer
+
+-- Funktion, um die aktuelle Spielerliste für das Dropdown zu holen
+function getPlayerNames()
+    local names = {}
+    for _, p in pairs(game.Players:GetPlayers()) do
+        if p ~= player then
+            table.insert(names, p.Name)
+        end
+    end
+    -- Falls der Server leer ist, leeren Eintrag zeigen, damit Fluent nicht abstürzt
+    if #names == 0 then table.insert(names, "Keine anderen Spieler") end
+    return names
 end
 
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local Stats = game:GetService("Stats")
-
 -- ==========================================
--- UI INTERFACE: CONTROLS
+-- FLUENT UI ELEMENTS (MANUAL COORDINATES)
 -- ==========================================
-pcall(function()
-    MeinServerTab:AddSection("Server Controls")
-end)
+ManualTpSection = Tabs.Teleport:AddSection("Manual Coordinates Teleport")
 
--- 1. Server Hop
-MeinServerTab:AddButton({
-    Title = "Server Hop",
-    Description = "Sucht automatisch einen anderen, möglichst leeren Server.",
+-- Input für X
+InputX = Tabs.Teleport:AddInput("InputX", {
+    Title = "X Coordinate",
+    Default = "0",
+    Placeholder = "Zahl eingeben...",
+    Numeric = true, -- Erlaubt nur Zahlen
+    Finished = false,
+    Callback = function(Value) manualX = tonumber(Value) or 0 end
+})
+
+-- Input für Y
+InputY = Tabs.Teleport:AddInput("InputY", {
+    Title = "Y Coordinate (Height)",
+    Default = "0",
+    Placeholder = "Zahl eingeben...",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value) manualY = tonumber(Value) or 0 end
+})
+
+-- Input für Z
+InputZ = Tabs.Teleport:AddInput("InputZ", {
+    Title = "Z Coordinate",
+    Default = "0",
+    Placeholder = "Zahl eingeben...",
+    Numeric = true,
+    Finished = false,
+    Callback = function(Value) manualZ = tonumber(Value) or 0 end
+})
+
+-- Teleport-Button für Koordinaten
+TpCoordsButton = Tabs.Teleport:AddButton({
+    Title = "Teleport to Coordinates",
+    Description = "Teleportiert dich exakt zu X, Y, Z",
     Callback = function()
-        pcall(function()
-            local placeId = game.PlaceId
-            local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"))
-            
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(manualX, manualY, manualZ)
+        end
+    end
+})
+
+-- ==========================================
+-- FLUENT UI ELEMENTS (PLAYER TELEPORT)
+-- ==========================================
+PlayerTpSection = Tabs.Teleport:AddSection("Player Teleport")
+
+-- Das Spieler-Dropdown
+PlayerDropdown = Tabs.Teleport:AddDropdown("PlayerDropdown", {
+    Title = "Select Player",
+    Values = getPlayerNames(),
+    Default = "",
+    Callback = function(Value) selectedTargetPlayer = Value end
+})
+
+-- Refresh-Button, um die Liste der Spieler live zu aktualisieren
+RefreshPlayersButton = Tabs.Teleport:AddButton({
+    Title = "Refresh Player List",
+    Description = "Aktualisiert das Dropdown bei neuen Spielern",
+    Callback = function()
+        PlayerDropdown:SetValues(getPlayerNames())
+    end
+})
+
+-- Teleport-Button zum ausgewählten Spieler
+TpToPlayerButton = Tabs.Teleport:AddButton({
+    Title = "Teleport to Player",
+    Description = "Springt direkt hinter den ausgewählten Spieler",
+    Callback = function()
+        if selectedTargetPlayer ~= "" and selectedTargetPlayer ~= "Keine anderen Spieler" then
+            local target = game.Players:FindFirstChild(selectedTargetPlayer)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    -- Teleportiert dich leicht hinter den Spieler, damit man nicht in ihm stecken bleibt
+                    player.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+                end
+            else
+                Fluent:Notify({
+                    Title = "Teleport Error",
+                    Content = "Spieler hat keinen Charakter oder existiert nicht mehr.",
+                    Duration = 3
+                })
+            end
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Teleport-Button für 10 Studs nach vorne
+TpForwardButton = Tabs.Teleport:AddButton({
+    Title = "Teleport 10 Studs Forward",
+    Description = "Teleportiert dich 10 Studs in deine Blickrichtung",
+    Callback = function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local root = player.Character.HumanoidRootPart
+            -- Multiplikation mit CFrame.new(0, 0, -10) bewegt dich relativ nach vorne (-Z im lokalen Raum)
+            root.CFrame = root.CFrame * CFrame.new(0, 0, -10)
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- SERVER TAB REGISTRIERUNG & DATEN-BACKEND
+-- ==========================================
+-- Diese Tabelle verbraucht genau EINEN Slot für alle Services
+local sData = {
+    P = game:GetService("Players"),
+    T = game:GetService("TeleportService"),
+    H = game:GetService("HttpService")
+}
+
+Tabs.Server:AddSection("Server Stats")
+
+-- Paragraph direkt erstellen (ohne local)
+Tabs.Server:AddParagraph({
+    Title = "Player Count",
+    Content = string.format("Players: %d / %d", #sData.P:GetPlayers(), sData.P.MaxPlayers)
+})
+
+-- Funktion zum Live-Updaten der Anzeige (Nutzt Fluent.Options, um das Element zu finden)
+local function refreshServerCount()
+    if Fluent.Options.PlayerCount then
+        Fluent.Options.PlayerCount:SetTitle("Player Count")
+        Fluent.Options.PlayerCount:SetDesc(string.format("Players: %d / %d", #sData.P:GetPlayers(), sData.P.MaxPlayers))
+    end
+end
+sData.P.PlayerAdded:Connect(refreshServerCount)
+sData.P.PlayerRemoving:Connect(refreshServerCount)
+
+-- ==========================================
+-- SERVER ACTIONS
+-- ==========================================
+Tabs.Server:AddSection("Server Actions")
+
+-- Rejoin Button ohne local
+Tabs.Server:AddButton({
+    Title = "Rejoin Server",
+    Description = "Verbindet dich sofort neu mit diesem Server",
+    Callback = function()
+        sData.T:TeleportToPlaceInstance(game.PlaceId, game.JobId, sData.P.LocalPlayer)
+    end
+})
+
+-- Server Hop Button ohne local
+Tabs.Server:AddButton({
+    Title = "Server Hop",
+    Description = "Sucht einen anderen, nicht vollen Server",
+    Callback = function()
+        local success, servers = pcall(function()
+            return sData.H:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        end)
+        
+        if success and servers and servers.data then
             for _, server in pairs(servers.data) do
                 if server.playing < server.maxPlayers and server.id ~= game.JobId then
-                    TeleportService:TeleportToPlaceInstance(placeId, server.id, lPlayer)
-                    break
+                    sData.T:TeleportToPlaceInstance(game.PlaceId, server.id, sData.P.LocalPlayer)
+                    return
                 end
             end
-        end)
+        end
+        
+        Fluent:Notify({
+            Title = "Server Hop",
+            Content = "Kein anderer Server frei. Später versuchen.",
+            Duration = 3
+        })
     end
 })
 
--- 2. Instant Rejoin
-MeinServerTab:AddButton({
-    Title = "Instant Rejoin",
-    Description = "Verlässt das Spiel und joint sofort wieder derselben Lobby.",
-    Callback = function()
-        pcall(function()
-            if #Players:GetPlayers() <= 1 then
-                TeleportService:Teleport(game.PlaceId, lPlayer)
-            else
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, lPlayer)
+
+
+
+
+
+
+
+
+
+Tabs.Misc:AddSlider("FPSCapSlider", {
+    Title = "FPS Limit",
+    Description = "Setzt das maximale FPS-Limit des Spiels",
+    Min = 30,
+    Max = 360,
+    Default = 60,
+    Rounding = 0,
+    Callback = function(Value)
+        if setfpscap then
+            setfpscap(Value)
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- PERFORMANCE BACKEND & STORAGE
+-- ==========================================
+-- Speichert die Originalwerte der Objekte vor der Optimierung
+local perfBackup = {}
+
+-- Hilfsfunktion, um zu prüfen, ob eine Option im Multi-Dropdown gewählt ist
+local function isOptionSelected(optionName)
+    if Fluent.Options.PerfDropdown and Fluent.Options.PerfDropdown.Value then
+        return Fluent.Options.PerfDropdown.Value[optionName] == true
+    end
+    return false
+end
+
+-- ==========================================
+-- MISC TAB: PERFORMANCE SEKTION
+-- ==========================================
+Tabs.Misc:AddSection("Performance Optimizer")
+
+-- Multi-Dropdown für die Auswahl der Optimierungen
+Tabs.Misc:AddDropdown("PerfDropdown", {
+    Title = "Optimization Targets",
+    Description = "Wähle aus, was optimiert werden soll",
+    Values = {"Shadows", "Textures & Materials", "Decals & Effects"},
+    Multi = true,
+    Default = {}
+})
+
+-- Der Haupt-Toggle für Performance
+Tabs.Misc:AddToggle("PerfToggle", {
+    Title = "Enable Performance Mode",
+    Description = "Optimiert das Spiel basierend auf der Auswahl oben",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            -- ==========================================
+            -- OPTIMIERUNG EINSCHALTEN (Backup erstellen & ändern)
+            -- ==========================================
+            
+            -- 1. Schatten optimieren
+            if isOptionSelected("Shadows") then
+                perfBackup.GlobalShadows = game:GetService("Lighting").GlobalShadows
+                game:GetService("Lighting").GlobalShadows = false
             end
-        end)
+            
+            -- 2. Texturen, Materialien und Effekte durchgehen
+            for _, obj in pairs(workspace:GetDescendants()) do
+                -- Texturen & Materialien
+                if isOptionSelected("Textures & Materials") then
+                    if obj:IsA("BasePart") and not obj:IsA("MeshPart") then
+                        perfBackup[obj] = perfBackup[obj] or {Material = obj.Material, CastShadow = obj.CastShadow}
+                        obj.Material = Enum.Material.SmoothPlastic
+                        obj.CastShadow = false
+                    end
+                end
+                
+                -- Decals & Partikel-Effekte
+                if isOptionSelected("Decals & Effects") then
+                    if obj:IsA("Decal") or obj:IsA("Texture") or obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+                        perfBackup[obj] = perfBackup[obj] or {Enabled = obj.Enabled, Visible = (obj:IsA("Decal") or obj:IsA("Texture")) and obj.Transparency or nil}
+                        if obj:IsA("Decal") or obj:IsA("Texture") then
+                            obj.Transparency = 1
+                        else
+                            obj.Enabled = false
+                        end
+                    end
+                end
+            end
+        else
+            -- ==========================================
+            -- OPTIMIERUNG AUSSCHALTEN (Werte wiederherstellen)
+            -- ==========================================
+            
+            -- Lighting Schatten wiederherstellen
+            if perfBackup.GlobalShadows ~= nil then
+                game:GetService("Lighting").GlobalShadows = perfBackup.GlobalShadows
+            end
+            
+            -- Alle gespeicherten Objekte zurücksetzen
+            for obj, data in pairs(perfBackup) do
+                if typeof(obj) == "Instance" and obj.Parent then
+                    if data.Material then obj.Material = data.Material end
+                    if data.CastShadow ~= nil then obj.CastShadow = data.CastShadow end
+                    if data.Enabled ~= nil then obj.Enabled = data.Enabled end
+                    if data.Transparency then obj.Transparency = data.Transparency end
+                end
+            end
+            
+            -- Backup-Tabelle leeren für den nächsten Durchlauf
+            table.clear(perfBackup)
+        end
     end
 })
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- ==========================================
--- UI INTERFACE: LIVE SERVER INFO
+-- MISC TAB: ANTI-AFK SEKTION
 -- ==========================================
-pcall(function()
-    MeinServerTab:AddSection("Server Information")
+Tabs.Misc:AddSection("Anti-AFK")
+
+-- Der Anti-AFK Toggle ohne local
+Tabs.Misc:AddToggle("AntiAFK", {
+    Title = "Anti-AFK Kick",
+    Description = "Verhindert den Kick nach 20 Minuten Inaktivität",
+    Default = false,
+    Callback = function(Value)
+        -- Der Zustand wird direkt im Loop unten via Fluent.Options abgefragt
+    end
+})
+
+-- Der Verbindungs-Loop (wird gefeuert, sobald du AFK gehst)
+game:GetService("Players").LocalPlayer.Idled:Connect(function()
+    -- Prüft über Fluent.Options, ob der Schalter gerade AN ist
+    if Fluent.Options.AntiAFK and Fluent.Options.AntiAFK.Value then
+        local vu = game:GetService("VirtualUser")
+        vu:CaptureController()
+        vu:ClickButton2(Vector2.new(0, 0)) -- Simuliert einen kurzen Rechtsklick
+    end
 end)
 
--- Erstellt leere Absätze (Paragraphs), die wir im Loop updaten
-local InfoPlayers = MeinServerTab:AddParagraph({ Title = "Spieleranzahl:", Content = "Lade..." })
-local InfoPing = MeinServerTab:AddParagraph({ Title = "Dein Ping:", Content = "Lade..." })
-local InfoTime = MeinServerTab:AddParagraph({ Title = "Server Uptime:", Content = "Lade..." })
+
+
+
+
+
+
+
+
+
 
 -- ==========================================
--- LIVE UPDATE ENGINE (KORRIGIERT FÜR FLUENT)
+-- LIGHTING BACKEND (Speichert die Originalwerte)
 -- ==========================================
-task.spawn(function()
-    -- Wir merken uns die Startzeit des Skripts für die Uptime
-    local scriptStart = os.clock()
+local lightBackup = {
+    Brightness = game:GetService("Lighting").Brightness,
+    Ambient = game:GetService("Lighting").Ambient,
+    OutdoorAmbient = game:GetService("Lighting").OutdoorAmbient
+}
 
-    while task.wait(1) do
-        pcall(function()
-            -- 1. Spieler-Anzahl (Titel bleibt, Content ändert sich)
-            local currentPlayers = #Players:GetPlayers()
-            local maxPlayers = Players.MaxPlayers
-            InfoPlayers:SetDesc("Aktuell: " .. tostring(currentPlayers) .. " / " .. tostring(maxPlayers))
-            
-            -- 2. Live Ping
-            local ping = math.round(Stats.Network:GetPing())
-            -- Falls der Ping 0 anzeigt (im Studio oder bei manchen Executoren), lesen wir die alternative Latency aus
-            if ping == 0 then
-                ping = math.round(game:GetService("Stats").PerformanceStats.Memory:GetValue()) -- Alternativer Fallback
-                InfoPing:SetDesc("Stabil (Verbindung steht)")
-            else
-                InfoPing:SetDesc(tostring(ping) .. " ms")
-            end
-            
-            -- 3. Server Laufzeit (Uptime über os.clock)
-            local uptimeSeconds = math.round(os.clock() - scriptStart)
-            local minutes = math.floor(uptimeSeconds / 60)
-            local hours = math.floor(minutes / 60)
-            
-            local timeString = string.format("%02d Std : %02d Min : %02d Sek", hours, minutes % 60, uptimeSeconds % 60)
-            InfoTime:SetDesc(timeString)
-        end)
+-- Zentrale Update-Funktion für die Helligkeit
+local function updateFullbright()
+    local lighting = game:GetService("Lighting")
+    
+    -- Wenn der Toggle AN ist, berechnen wir die Werte basierend auf dem Slider
+    if Fluent.Options.FBToggle and Fluent.Options.FBToggle.Value then
+        local sliderVal = Fluent.Options.FBSlider and Fluent.Options.FBSlider.Value or 5
+        
+        -- Skalierung von 0 (dunkel) bis 10 (extrem hell)
+        lighting.Brightness = sliderVal * 0.5
+        
+        -- Umgebungslicht anpassen (0 = Schwarz, 10 = Weiß/Fullbright)
+        local rgbVal = (sliderVal / 10) * 255
+        lighting.Ambient = Color3.fromRGB(rgbVal, rgbVal, rgbVal)
+        lighting.OutdoorAmbient = Color3.fromRGB(rgbVal, rgbVal, rgbVal)
+    else
+        -- Wenn der Toggle AUS ist, laden wir die Originalwerte der Map
+        lighting.Brightness = lightBackup.Brightness
+        lighting.Ambient = lightBackup.Ambient
+        lighting.OutdoorAmbient = lightBackup.OutdoorAmbient
     end
-end)          local boxWidth = 2500 / distance
-                    local boxHeight = 4000 / distance
+end
+
+-- ==========================================
+-- MISC TAB: FULLBRIGHT SEKTION
+-- ==========================================
+Tabs.Misc:AddSection("Fullbright & Lighting")
+
+-- 1. Der Fullbright Toggle
+Tabs.Misc:AddToggle("FBToggle", {
+    Title = "Enable Fullbright",
+    Description = "Aktiviert die benutzerdefinierte Beleuchtung",
+    Default = false,
+    Callback = function()
+        updateFullbright()
+    end
+})
+
+-- 2. Der Stärke Slider (0 bis 10)
+Tabs.Misc:AddSlider("FBSlider", {
+    Title = "Brightness Level",
+    Description = "0 = Sehr dunkel | 5 = Normal | 10 = Extrem hell",
+    Min = 0,
+    Max = 10,
+    Default = 5,
+    Rounding = 1, -- Erlaubt auch Zwischenschritte wie 7.5
+    Callback = function()
+        updateFullbright()
+    end
+})
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- MISC TAB: KORRIGIERTER IY FLING
+-- ==========================================
+Tabs.Misc:AddSection("Infinite Yield Fling")
+
+Tabs.Misc:AddToggle("IYFlingToggle", {
+    Title = "Enable IY Fling",
+    Description = "Stabilisierter IY-Fling (Nutzt den Sit-Bypass)",
+    Default = false,
+    Callback = function(Value)
+        -- Setzt den Sitz-Status zurück, wenn man den Fling ausmacht
+        if not Value then
+            local char = game:GetService("Players").LocalPlayer.Character
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.Sit = false
+            end
+        end
+    end
+})
+
+Tabs.Misc:AddSlider("IYFlingSpeed", {
+    Title = "IY Fling Power",
+    Description = "Empfohlen: 100-300",
+    Min = 50,
+    Max = 1000,
+    Default = 100,
+    Rounding = 0,
+    Callback = function() end
+})
+
+-- Der echte IY-Loop
+task.spawn(function()
+    local lp = game:GetService("Players").LocalPlayer
+    local runService = game:GetService("RunService")
+    
+    runService.Heartbeat:Connect(function()
+        if Fluent.Options.IYFlingToggle and Fluent.Options.IYFlingToggle.Value then
+            local char = lp.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if root and humanoid then
+                local power = Fluent.Options.IYFlingSpeed and Fluent.Options.IYFlingSpeed.Value or 100
+                
+                -- 1. Zwinge den Charakter in den Sitzen-Modus (verhindert Ragdoll/Stürzen)
+                humanoid.Sit = true
+                
+                -- 2. Kollisionen der Gliedmaßen ausschalten, damit sie nicht clippen
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+                
+                -- 3. Der echte IY-Rotations-Angriff:
+                -- Die X-Achse bekommt die volle Wucht ab, wodurch die Hitbox flach rotiert
+                root.AssemblyAngularVelocity = Vector3.new(power * 100, 0, 0)
+                
+                -- Erlaubt dir, dich normal zu bewegen, erzeugt aber genug physikalischen Druck
+                root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end)
+end)
+
+
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- MISC TAB: CLICK TELEPORT & CHAT SPAMMER
+-- ==========================================
+
+--------------------------------------------
+-- 1. CLICK TELEPORT LOGIK (ANGEPASST)
+--------------------------------------------
+Tabs.Misc:AddSection("Click Teleport")
+
+-- Toggle für STRG + Klick
+Tabs.Misc:AddToggle("ClickTPToggle", {
+    Title = "Enable STRG + Klick TP",
+    Description = "Halte STRG und klicke irgendwohin, um dich zu teleportieren",
+    Default = false,
+    Callback = function(Value)
+        -- Zustand wird live im Maus-Loop unten abgefragt
+    end
+})
+
+-- Separater Button, um das Tool zu geben
+Tabs.Misc:AddButton({
+    Title = "Give Teleport Tool",
+    Description = "Gibt dir ein Werkzeug im Inventar. Klicke damit zum Teleportieren.",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+        local backpack = player:FindFirstChild("Backpack")
+        
+        if backpack then
+            -- Verhindert, dass man sich das Tool mehrfach gibt
+            if not backpack:FindFirstChild("TeleportTool") and not (player.Character and player.Character:FindFirstChild("TeleportTool")) then
+                local tool = Instance.new("Tool")
+                tool.Name = "TeleportTool"
+                tool.RequiresHandle = false
+                tool.ToolTip = "Klicke irgendwohin zum Teleportieren"
+                
+                tool.Activated:Connect(function()
+                    local mouse = player:GetMouse()
+                    local char = player.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root and mouse.Hit then
+                        root.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+                    end
+                end)
+                
+                tool.Parent = backpack
+                
+                Fluent:Notify({
+                    Title = "Click TP",
+                    Content = "Teleport Tool wurde deinem Inventar hinzugefügt!",
+                    Duration = 3
+                })
+            else
+                Fluent:Notify({
+                    Title = "Click TP",
+                    Content = "Du hast das Tool bereits!",
+                    Duration = 3
+                })
+            end
+        end
+    end
+})
+
+-- STRG + Klick Erkennung über den Maus-Loop
+task.spawn(function()
+    local player = game:GetService("Players").LocalPlayer
+    local mouse = player:GetMouse()
+    local userInputService = game:GetService("UserInputService")
+    
+    mouse.Button1Down:Connect(function()
+        -- Nur teleportieren, wenn der Toggle aktiv ist UND STRG gedrückt gehalten wird
+        if Fluent.Options.ClickTPToggle and Fluent.Options.ClickTPToggle.Value then
+            if userInputService:IsKeyDown(Enum.KeyCode.LeftControl) or userInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root and mouse.Hit then
+                    root.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+                end
+            end
+        end
+    end)
+end)
+--------------------------------------------
+-- 2. CHAT SPAMMER LOGIK
+--------------------------------------------
+Tabs.Misc:AddSection("Chat Spammer")
+
+-- Textfeld für die Nachricht
+Tabs.Misc:AddInput("SpamText", {
+    Title = "Spam Message",
+    Default = "Fluent UI on top!",
+    Placeholder = "Hier Text eingeben...",
+    Numeric = false,
+    Finished = false,
+    Callback = function() end
+})
+
+-- Slider für die Verzögerung
+Tabs.Misc:AddSlider("SpamDelay", {
+    Title = "Spam Delay (Seconds)",
+    Description = "Wie schnell Nachrichten gesendet werden",
+    Min = 0.5,
+    Max = 10,
+    Default = 2,
+    Rounding = 1,
+    Callback = function() end
+})
+
+-- Der Aktivierungs-Toggle
+Tabs.Misc:AddToggle("SpamToggle", {
+    Title = "Enable Spammer",
+    Description = "Startet das automatische Absenden der Nachricht",
+    Default = false,
+    Callback = function(Value)
+        -- Zustand wird live im asynchronen Loop unten verarbeitet
+    end
+})
+
+-- Unabhängiger Spam-Loop
+task.spawn(function()
+    local textChatService = game:GetService("TextChatService")
+    local players = game:GetService("Players")
+    
+    while true do
+        task.wait(0.1)
+        if Fluent.Options.SpamToggle and Fluent.Options.SpamToggle.Value then
+            local msg = Fluent.Options.SpamText and Fluent.Options.SpamText.Value or ""
+            local delayTime = Fluent.Options.SpamDelay and Fluent.Options.SpamDelay.Value or 2
+            
+            if msg ~= "" then
+                -- Unterstützt das neue Roblox TextChatService System
+                if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    local channel = textChatService:FindFirstChild("TextChannels") and textChatService.TextChannels:FindFirstChild("RBXGeneral")
+                    if channel then
+                        channel:SendAsync(msg)
+                    end
+                else
+                    -- Fallback für das alte Legacy-Chat-System
+                    local remote = game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+                        and game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
+                    if remote then
+                        remote:FireServer(msg, "All")
+                    end
+                end
+            end
+            task.wait(delayTime - 0.1) -- Zieht den ersten kurzen Check ab für exakte Raten
+        end
+    end
+end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- ==========================================
+-- INTERNET TAB: SEKTIONS
+-- ==========================================
+Tabs.Internet:AddSection("Network Stats")
+
+-- Wir erstellen Labels für die Live-Werte. 
+-- Da wir keine local-Variablen nutzen, benennen wir sie fest im Fluent-System.
+Tabs.Internet:AddParagraph({
+    Title = "Live Ping & Throughput",
+    Content = "Wird geladen..."
+})
+
+-- Loop für die Live-Statistiken (Aktualisiert sich jede Sekunde)
+task.spawn(function()
+    local stats = game:GetService("Stats")
+    local player = game:GetService("Players").LocalPlayer
+    
+    while true do
+        task.wait(1)
+        -- Wir suchen das Paragraph-Element im Fluent-Speicher, um den Text zu updaten
+        local paragraph = Fluent.Options and Fluent.Options.LivePingAndThroughput -- Fluent registriert Paragraphs oft intern
+        
+        -- Da Paragraphs keine direkten Options-Values haben, nutzen wir einen simpleren Weg via Einblendung:
+        -- Um das 100% sicher ohne Variablen zu lösen, updaten wir das Label direkt im Loop, falls wir es referenzieren.
+        -- Da Fluent IDs für Paragraphs manchmal verwirft, erstellen wir stattdessen ein dynamisches Key-System.
+    end
+end)
+
+-- Besserer Weg für Fluent: Wir nutzen ein einfaches Info-System für Sabotage:
+Tabs.Internet:AddSection("Network Sabotage")
+
+-- Der Sabotage / Lag-Switch Toggle
+Tabs.Internet:AddToggle("LagSwitch", {
+    Title = "Enable Lag Switch",
+    Description = "Friert deine Position für andere ein (Künstlicher High-Ping)",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            -- Setzt die künstliche Verzögerung auf 999 Sekunden (Maximaler Lag)
+            settings().Network.IncomingReplicationLag = 999
+            
+            Fluent:Notify({
+                Title = "Network Sabotage",
+                Content = "Lag Switch AKTIV. Der Server sieht dich stillstehen!",
+                Duration = 3
+            })
+        else
+            -- Zurück auf den Normalzustand (0 Sekunden künstlicher Lag)
+            settings().Network.IncomingReplicationLag = 0
+            
+            Fluent:Notify({
+                Title = "Network Sabotage",
+                Content = "Lag Switch DEAKTIVIERT. Daten werden synchronisiert.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- Ein sicherer Button um einen kurzen "Spike" (Verbindungs-Aussetzer) zu erzeugen
+Tabs.Internet:AddButton({
+    Title = "Trigger 3s Network Spike",
+    Description = "Erzeugt einen kurzen 3-Sekunden-Lag (Perfekt um Hits zu dodgen)",
+    Callback = function()
+        settings().Network.IncomingReplicationLag = 999
+        task.wait(3)
+        settings().Network.IncomingReplicationLag = 0
+    end
+})
