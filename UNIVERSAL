@@ -253,12 +253,16 @@ local JumpSection = Tabs.PLTAB:AddSection("fly")
 
 
 
+
 local flyEnabled = false
 local flySpeed = 50
 local useAnchored = false
 local useQE = true
 local useKeybind = false
 local flyKey = Enum.KeyCode.F -- Standard-Keybind ist F
+
+-- NEU: Diese Variable merkt sich, ob der Reset nach dem Fliegen schon erledigt wurde
+local flyResetDone = true 
 
 local player = game.Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -272,6 +276,9 @@ task.spawn(function()
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
         if rootPart and humanoid and flyEnabled then
+            -- Wir fliegen, also muss beim nächsten Ausschalten resettet werden
+            flyResetDone = false
+            
             -- Erzwingt den Flug-Zustand, damit Roblox die Gravitation ignoriert
             humanoid:ChangeState(Enum.HumanoidStateType.Flying)
             
@@ -303,21 +310,32 @@ task.spawn(function()
                 end
             end
         else
-            -- Reset, wenn Fly ausgeschaltet wird
-            if rootPart and rootPart.Anchored then
-                rootPart.Anchored = false
+            -- FIX: Wenn Fly AUS ist, resetten wir die Velocity NUR EINMALIG
+            if rootPart and not flyResetDone then
+                if rootPart.Anchored then
+                    rootPart.Anchored = false
+                end
+                rootPart.AssemblyLinearVelocity = Vector3.zero
+                rootPart.AssemblyAngularVelocity = Vector3.zero
+                
+                -- Signalisiert der Schleife, dass der Brems-Reset fertig ist 
+                -- und blockiert weitere Bremsungen, damit der Honig-Effekt verschwindet!
+                flyResetDone = true
             end
         end
     end
 end)
 
 -- Toggle für das Fliegen selbst
-_G.FlyToggleElement = Tabs.PLTAB:AddToggle("FlyToggle", {
+local FlyToggle = Tabs.PLTAB:AddToggle("FlyToggle", {
     Title = "Enable Fly",
     Description = "Lässt dich in Blickrichtung fliegen",
     Default = false,
     Callback = function(Value)
         flyEnabled = Value
+        if not Value then
+            flyResetDone = false -- Erzwingt den einmaligen Brems-Reset im Loop
+        end
     end
 })
 
@@ -362,16 +380,18 @@ local UseKeybindToggle = Tabs.PLTAB:AddToggle("UseKeybindToggle", {
     end
 })
 
--- FIX: Offizieller Fluent-Weg für funktionierende Keybinds
+-- Keybind für Fly
 local FlyKeybind = Tabs.PLTAB:AddKeybind("FlyKeybind", {
     Title = "Fly Keybind",
     Mode = "Toggle", 
     Default = "F",
     Callback = function(Value)
-        -- Der Keybind triggert NUR, wenn der "Use Keybind" Toggle an ist
         if useKeybind then
             flyEnabled = not flyEnabled
-            FlyToggle:SetValue(flyEnabled) -- Schaltet den visuellen Haken im UI um
+            FlyToggle:SetValue(flyEnabled)
+            if not flyEnabled then
+                flyResetDone = false -- Erzwingt den einmaligen Brems-Reset im Loop
+            end
         end
     end
 })
