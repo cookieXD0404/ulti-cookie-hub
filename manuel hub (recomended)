@@ -12,7 +12,7 @@ local GamesTable = {
         Name = "Universal Main Script", 
         Status = "gruen", 
         Desc = "Das All-in-One Skript für alle Spiele.\nBeinhaltet: Player Tweaks, Visuals, Server Hop und Performance Booster.",
-        Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/f9e3a07a50b55503b04bf37b9587779881b438ab/UNIVERSAL"
+        Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/refs/heads/main/UNIVERSAL"
     },
 
 }
