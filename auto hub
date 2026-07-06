@@ -26,7 +26,7 @@ local GamesDatabase = {
 local UniversalScript = {
     Name = "Universal Cookie Main",
     Status = "gruen",
-    Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/f9e3a07a50b55503b04bf37b9587779881b438ab/UNIVERSAL"
+    Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/refs/heads/main/UNIVERSAL"
 }
 
 -- Aktuelles Spiel erkennen
