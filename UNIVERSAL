@@ -862,35 +862,77 @@ local function isEnemy(targetPlayer)
 end
 
 -- Prüft, ob eine Wand zwischen deiner Kamera und dem Gegner ist
+-- Modernisiertes Wall-Check System mit korrekter Ignore-Liste
 local function isVisible(targetPart)
     if not wallCheck then return true end
-    local castRay = Ray.new(camera.CFrame.Position, (targetPart.Position - camera.CFrame.Position).Unit * 1000)
-    local hit, position = workspace:FindPartOnRayWithIgnoreList(castRay, {player.Character, targetPart.Parent})
-    return hit == nil
+    
+    local raycastParams = RaycastParams.new()
+    -- Ignoriert dich selbst und den Charakter, den du gerade anvisierst
+    raycastParams.FilterDescendantsInstances = {player.Character, targetPart.Parent}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.IgnoreWater = true
+    
+    local startPos = camera.CFrame.Position
+    local direction = (targetPart.Position - startPos)
+    
+    local raycastResult = workspace:Raycast(startPos, direction, raycastParams)
+    
+    -- Wenn der Strahl nichts blockierendes trifft, ist der Gegner sichtbar
+    return raycastResult == nil
 end
 
--- Sucht den besten Gegner im FOV-Kreis
+-- NEU: Hilfsfunktion, die das Ziel-Part holt oder ein Fallback im Custom-Model sucht
+local function getAimTarget(character)
+    -- Versuch 1: Das im UI ausgewählte Part finden
+    local primary = character:FindFirstChild(aimPart)
+    if primary and primary:IsA("BasePart") then
+        return primary
+    end
+    
+    -- Versuch 2: Das offizielle PrimaryPart des Models nutzen
+    if character.PrimaryPart then
+        return character.PrimaryPart
+    end
+    
+    -- Versuch 3: Das erste beste physische Teil im Custom-Model greifen (Fallback)
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            return part
+        end
+    end
+    
+    return nil
+end
+
+-- Sucht den besten Gegner im FOV-Kreis (INKLUSIVE FALLBACK FÜR CUSTOM CHARS)
 local function getClosestPlayerToMouse()
     local closestPlayer = nil
+    local closestPart = nil
     local shortestDistance = fovCircleEnabled and fovRadius or math.huge
 
     for _, v in pairs(game.Players:GetPlayers()) do
-        if v ~= player and v.Character and v.Character:FindFirstChild(aimPart) and v.Character:FindFirstChildOfClass("Humanoid") then
-            if v.Character.Humanoid.Health > 0 and isEnemy(v) and isVisible(v.Character[aimPart]) then
-                local pos, onScreen = camera:WorldToViewportPoint(v.Character[aimPart].Position)
-                if onScreen then
-                    local mousePos = Vector2.new(mouse.X, mouse.Y)
-                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
-                    
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closestPlayer = v
+        if v ~= player and v.Character and v.Character:FindFirstChildOfClass("Humanoid") then
+            if v.Character.Humanoid.Health > 0 and isEnemy(v) then
+                -- Holt das korrekte Part (entweder Wunsch-Part oder Fallback)
+                local targetPart = getAimTarget(v.Character)
+                
+                if targetPart and isVisible(targetPart) then
+                    local pos, onScreen = camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen then
+                        local mousePos = Vector2.new(mouse.X, mouse.Y)
+                        local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                        
+                        if distance < shortestDistance then
+                            shortestDistance = distance
+                            closestPlayer = v
+                            closestPart = targetPart -- Merken, welches Part wir anvisieren
+                        end
                     end
                 end
             end
         end
     end
-    return closestPlayer
+    return closestPlayer, closestPart
 end
 
 -- AIMBOT & FOV LOOP
@@ -911,13 +953,15 @@ runService.RenderStepped:Connect(function()
             return
         end
 
-        local target = getClosestPlayerToMouse()
-        if target and target.Character and target.Character:FindFirstChild(aimPart) then
-            local targetPosition = target.Character[aimPart].Position
+        local target, targetPart = getClosestPlayerToMouse()
+        if target and targetPart then
+            local targetPosition = targetPart.Position
             
             -- PREDICTION: Berechnet die Bewegung basierend auf der Geschwindigkeit des Gegners
-            if predictionEnabled and target.Character:FindFirstChild("HumanoidRootPart") then
-                local velocity = target.Character.HumanoidRootPart.AssemblyLinearVelocity
+            -- Nutzt das targetPart oder das HumanoidRootPart falls vorhanden
+            if predictionEnabled then
+                local root = target.Character:FindFirstChild("HumanoidRootPart") or targetPart
+                local velocity = root.AssemblyLinearVelocity
                 -- Eine einfache Zeit-Konstante (0.135) simuliert die Flugzeit/Ping
                 targetPosition = targetPosition + (velocity * 0.135)
             end
