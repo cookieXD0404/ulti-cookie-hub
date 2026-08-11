@@ -11,8 +11,14 @@ local GamesTable = {
     {
         Name = "Universal Main Script", 
         Status = "gruen", 
-        Desc = "Das All-in-One Skript für alle Spiele.\nBeinhaltet: Player Tweaks, Visuals, Server Hop und Performance Booster.",
+        Desc = "Universal for all games can break some games or just visuel bugs.",
         Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/refs/heads/main/UNIVERSAL"
+    },
+    {
+        Name = "Backroms Unternehme", 
+        Status = "gruen", 
+        Desc = "a good working script will be updated to have more.",
+        Link = "https://raw.githubusercontent.com/cookieXD0404/ulti-cookie-hub/refs/heads/main/BACKROMS%20UNTERNEHMEN"
     },
 
 }
