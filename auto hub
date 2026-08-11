@@ -130,16 +130,14 @@ UniversalBtn.MouseEnter:Connect(function() UniversalStroke.Color = Color3.fromRG
 UniversalBtn.MouseLeave:Connect(function() UniversalStroke.Color = Color3.fromRGB(45, 45, 50) end)
 
 -- ==========================================
--- LOADING ENGINE (UNIVERSALER LADEBALKEN)
+-- LOADING ENGINE
 -- ==========================================
 local function StartLoadingBar(targetScript, isSilentMode)
-    -- Alle Knöpfe ausblenden
     SilentBtn.Visible = false
     NormalBtn.Visible = false
     UniversalBtn.Visible = false
     SubTitle.Visible = false
     
-    -- Fenster verkleinern für den Balken
     TweenService:Create(DecisionFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 340, 0, 100)}):Play()
     
     if isSilentMode then
@@ -148,7 +146,6 @@ local function StartLoadingBar(targetScript, isSilentMode)
         Title.Text = "INITIALIZING COOKIE ENGINE..."
     end
     
-    -- Ladebalken Erstellung
     local BarBackground = Instance.new("Frame", DecisionFrame)
     BarBackground.Size = UDim2.new(1, -40, 0, 8)
     BarBackground.Position = UDim2.new(0, 20, 0, 60)
@@ -170,7 +167,6 @@ local function StartLoadingBar(targetScript, isSilentMode)
     PercentText.TextSize = 11
 
     task.spawn(function()
-        -- Ladezeit bestimmen: Silent/Universal dauert 10 Sekunden, Normal dauert 5 Sekunden
         local loadDuration = isSilentMode and 10 or 5
         
         TweenService:Create(LoadingBar, TweenInfo.new(loadDuration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 1, 0)}):Play()
@@ -178,7 +174,6 @@ local function StartLoadingBar(targetScript, isSilentMode)
         for i = 0, 100 do
             PercentText.Text = tostring(i) .. "%"
             
-            -- Simuliere realistische Hänger bei bestimmten Prozenten
             if i == 32 or i == 84 then
                 task.wait(isSilentMode and 0.5 or 0.2)
             else
@@ -190,9 +185,7 @@ local function StartLoadingBar(targetScript, isSilentMode)
         PercentText.TextColor3 = Color3.fromRGB(0, 255, 120)
         task.wait(0.5)
         
-        -- Nach dem Laden aufräumen
         if isSilentMode then
-            -- Silent-Modus löscht erst ALLES restlos vor dem Ausführen
             ScreenGui.Enabled = false
             BlurEffect:Destroy()
             ScreenGui:Destroy()
@@ -203,7 +196,6 @@ local function StartLoadingBar(targetScript, isSilentMode)
                 loadstring(game:HttpGet(targetScript.Link))()
             end)
         else
-            -- Normaler Modus
             local blurTween = TweenService:Create(BlurEffect, TweenInfo.new(0.4), {Size = 0})
             blurTween:Play()
             blurTween.Completed:Connect(function() BlurEffect:Destroy() end)
@@ -219,18 +211,14 @@ end
 -- ==========================================
 -- BUTTON CLICKS
 -- ==========================================
-
--- Klick auf Silent Load (Balken läuft 10s)
 SilentBtn.MouseButton1Click:Connect(function()
     StartLoadingBar(DetectedGame, true)
 end)
 
--- Klick auf Universal Load (Nutzt ebenfalls den 10s Silent-Schutz)
 UniversalBtn.MouseButton1Click:Connect(function()
     StartLoadingBar(UniversalScript, true)
 end)
 
--- Klick auf Normal Load (Balken läuft 5s)
 NormalBtn.MouseButton1Click:Connect(function()
     StartLoadingBar(DetectedGame, false)
 end)
