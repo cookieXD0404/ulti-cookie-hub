@@ -1,0 +1,490 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "backrooms",
+    SubTitle = "v1.0",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    lp = Window:AddTab({ Title = "player", Icon = "" }),
+    visuel = Window:AddTab({ Title = "visuel", Icon = "" }),
+    auto = Window:AddTab({ Title = "automatic stuff", Icon = "" })
+}
+
+
+Tabs.visuel:AddParagraph({
+    Title = "ESP",
+    Content = "higlight stuff"
+})
+
+
+-- Items Highlight Setup
+local activeHighlights = {}
+local isHighlightActive = false
+
+local function clearHighlights()
+    for obj, highlight in pairs(activeHighlights) do
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+    activeHighlights = {}
+end
+
+local function updateHighlights()
+    clearHighlights()
+    
+    local folder = workspace:FindFirstChild("GameTriggers")
+    folder = folder and folder:FindFirstChild("Items")
+    if not folder then return end
+
+    for _, obj in ipairs(folder:GetDescendants()) do
+        if obj:IsA("BasePart") and not activeHighlights[obj] then
+            local highlight = Instance.new("Highlight")
+            highlight.Adornee = obj
+            highlight.FillColor = Color3.fromRGB(0, 170, 255)
+            highlight.Parent = obj
+            highlight.OutlineTransparency = 1 
+            activeHighlights[obj] = highlight
+        end
+    end
+end
+
+Tabs.visuel:AddToggle("ItemHighlights", {
+    Title = "Item Highlights",
+    Default = false,
+    Callback = function(state)
+        isHighlightActive = state
+        
+        if state then
+            updateHighlights()
+            task.spawn(function()
+                while isHighlightActive do
+                    task.wait(3)
+                    if isHighlightActive then
+                        updateHighlights()
+                    end
+                end
+            end)
+        else
+            clearHighlights()
+        end
+    end
+})
+
+-- SpawnedEntities Highlight Setup
+local activeEntityHighlights = {}
+local isEntityHighlightActive = false
+
+local function clearEntityHighlights()
+    for obj, highlight in pairs(activeEntityHighlights) do
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+    activeEntityHighlights = {}
+end
+
+local function updateEntityHighlights()
+    clearEntityHighlights()
+    
+    local folder = workspace:FindFirstChild("GameTriggers")
+    folder = folder and folder:FindFirstChild("SpawnedEntities")
+    if not folder then return end
+
+    for _, obj in ipairs(folder:GetDescendants()) do
+        if obj:IsA("BasePart") and not activeEntityHighlights[obj] then
+            local highlight = Instance.new("Highlight")
+            highlight.Adornee = obj
+            highlight.FillColor = Color3.fromRGB(255, 50, 50)
+            highlight.Parent = obj
+            highlight.OutlineTransparency = 1 
+            activeEntityHighlights[obj] = highlight
+        end
+    end
+end
+
+Tabs.visuel:AddToggle("EntityHighlights", {
+    Title = "Entity Highlights",
+    Default = false,
+    Callback = function(state)
+        isEntityHighlightActive = state
+        
+        if state then
+            updateEntityHighlights()
+            task.spawn(function()
+                while isEntityHighlightActive do
+                    task.wait(3)
+                    if isEntityHighlightActive then
+                        updateEntityHighlights()
+                    end
+                end
+            end)
+        else
+            clearEntityHighlights()
+        end
+    end
+})
+
+
+Tabs.visuel:AddParagraph({
+    Title = "Other",
+    Content = "usefull stuff"
+})
+
+
+Tabs.visuel:AddToggle("DisableStatic", {
+    Title = "Disable Static Effect",
+    Default = false,
+    Callback = function(state)
+        local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+        local staticGui = playerGui and playerGui:FindFirstChild("StaticGui")
+        
+        if staticGui then
+            staticGui.Enabled = not state
+        end
+    end
+})
+
+
+Tabs.visuel:AddParagraph({
+    Title = "Fullbright",
+    Content = "make flashlight useles and lets you see anything"
+})
+
+
+local Lighting = game:GetService("Lighting")
+
+local originalBrightness = Lighting.Brightness
+local originalClockTime = Lighting.ClockTime
+local originalGlobalShadows = Lighting.GlobalShadows
+local originalFogEnd = Lighting.FogEnd
+local originalOutdoorAmbient = Lighting.OutdoorAmbient
+
+Tabs.visuel:AddToggle("FullbrightToggle", {
+    Title = "Fullbright",
+    Default = false,
+    Callback = function(state)
+        if state then
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 100000
+            Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        else
+            Lighting.Brightness = originalBrightness
+            Lighting.ClockTime = originalClockTime
+            Lighting.GlobalShadows = originalGlobalShadows
+            Lighting.FogEnd = originalFogEnd
+            Lighting.OutdoorAmbient = originalOutdoorAmbient
+        end
+    end
+})
+
+Tabs.visuel:AddSlider("FullbrightSlider", {
+    Title = "Fullbright Stärke",
+    Description = "0 = Normal, 20 = Sehr hell",
+    Default = 0,
+    Min = 0,
+    Max = 20,
+    Rounding = 1,
+    Callback = function(value)
+        if value > 0 then
+            Lighting.Brightness = value
+            Lighting.ClockTime = 14
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 100000
+            Lighting.OutdoorAmbient = Color3.fromRGB(value * 12, value * 12, value * 12)
+        else
+            Lighting.Brightness = originalBrightness
+            Lighting.ClockTime = originalClockTime
+            Lighting.GlobalShadows = originalGlobalShadows
+            Lighting.FogEnd = originalFogEnd
+            Lighting.OutdoorAmbient = originalOutdoorAmbient
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+Tabs.lp:AddParagraph({
+    Title = "Godmode",
+    Content = "you cant die(only entities)"
+})
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local isGodModeActive = false
+local godmodeConnection
+local radius = 25 -- Größerer Radius (25 Studs)
+
+Tabs.lp:AddToggle("GodModeToggle", {
+    Title = "Anti-Entity Godmode (neds no void if you dont wanna die)",
+    Default = false,
+    Callback = function(state)
+        isGodModeActive = state
+        
+        if state then
+            godmodeConnection = RunService.RenderStepped:Connect(function()
+                if not isGodModeActive then return end
+                
+                local character = player.Character
+                if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+                local rootPart = character.HumanoidRootPart
+                
+                local folder = workspace:FindFirstChild("GameTriggers")
+                folder = folder and folder:FindFirstChild("SpawnedEntities")
+                if not folder then return end
+                
+                for _, obj in ipairs(folder:GetDescendants()) do
+                    if obj:IsA("BasePart") then
+                        local distance = (rootPart.Position - obj.Position).Magnitude
+                        if distance < radius then
+                            local direction = (rootPart.Position - obj.Position) * Vector3.new(1, 0, 1)
+                            if direction.Magnitude > 0 then
+                                direction = direction.Unit
+                            else
+                                direction = Vector3.new(0, 0, 1)
+                            end
+                            rootPart.CFrame = rootPart.CFrame + (direction * 3)
+                        end
+                    end
+                end
+            end)
+        else
+            if godmodeConnection then
+                godmodeConnection:Disconnect()
+                godmodeConnection = nil
+            end
+        end
+    end
+})
+
+
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local antiVoidPart = nil
+local voidConnection = nil
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local antiVoidPart = nil
+local voidConnection = nil
+
+Tabs.lp:AddToggle("AntiVoidToggle", {
+    Title = "no pitals/no void",
+    Default = false,
+    Callback = function(state)
+        if state then
+            local player = Players.LocalPlayer
+            local char = player.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            
+            -- Y-Höhe beim Spawn festlegen
+            local spawnY = char.HumanoidRootPart.Position.Y - 5
+            
+            antiVoidPart = Instance.new("Part")
+            antiVoidPart.Name = "AntiVoid"
+            antiVoidPart.Size = Vector3.new(30, 1, 30)
+            antiVoidPart.Anchored = true
+            antiVoidPart.Transparency = 0.5
+            antiVoidPart.BrickColor = BrickColor.new("black")
+            antiVoidPart.CanCollide = true
+            antiVoidPart.Parent = workspace.CurrentCamera
+            
+            voidConnection = RunService.RenderStepped:Connect(function()
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    -- Plattform folgt X und Z, behält aber die ursprüngliche Y-Höhe
+                    antiVoidPart.CFrame = CFrame.new(root.Position.X, spawnY, root.Position.Z)
+                end
+            end)
+        else
+            if voidConnection then voidConnection:Disconnect() end
+            if antiVoidPart then antiVoidPart:Destroy() end
+        end
+    end
+})
+
+Tabs.lp:AddParagraph({
+    Title = "player",
+    Content = "modifie your player"
+})
+
+
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local speedActive = false
+local customSpeed = 16
+local speedConnection
+
+local function updateSpeedConnection()
+    if (speedActive and tonumber(customSpeed) and customSpeed > 16) then
+        if not speedConnection then
+            speedConnection = RunService.RenderStepped:Connect(function(dt)
+                local speedVal = tonumber(customSpeed) or 16
+                if not speedActive or speedVal <= 16 then return end
+                local char = player.Character
+                if not char then return end
+                local root = char:FindFirstChild("HumanoidRootPart")
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                
+                if root and humanoid and humanoid.MoveDirection.Magnitude > 0 then
+                    local moveDir = humanoid.MoveDirection.Unit
+                    root.CFrame = root.CFrame + (moveDir * (speedVal - 16) * dt)
+                end
+            end)
+        end
+    else
+        if speedConnection then
+            speedConnection:Disconnect()
+            speedConnection = nil
+        end
+    end
+end
+
+Tabs.lp:AddToggle("SpeedToggle", {
+    Title = "Vector Speed",
+    Default = false,
+    Callback = function(state)
+        speedActive = state
+        updateSpeedConnection()
+    end
+})
+
+Tabs.lp:AddSlider("SpeedSlider", {
+    Title = "Speed Stärke",
+    Default = 16,
+    Min = 16,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(value)
+        customSpeed = tonumber(value) or 16
+        updateSpeedConnection()
+    end
+})
+
+
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local isNoclipActive = false
+local originalCollisions = {}
+local noclipConnection
+
+Tabs.lp:AddToggle("NoclipToggle", {
+    Title = "Noclip",
+    Default = false,
+    Callback = function(state)
+        isNoclipActive = state
+        
+        if state then
+            originalCollisions = {}
+            noclipConnection = RunService.Stepped:Connect(function()
+                local character = player.Character
+                if not character then return end
+                
+                for _, part in ipairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        if originalCollisions[part] == nil then
+                            originalCollisions[part] = part.CanCollide
+                        end
+                        part.CanCollide = false
+                    end
+                end
+            end)
+        else
+            if noclipConnection then
+                noclipConnection:Disconnect()
+                noclipConnection = nil
+            end
+            
+            for part, originalCanCollide in pairs(originalCollisions) do
+                if part and part.Parent then
+                    part.CanCollide = originalCanCollide
+                end
+            end
+            originalCollisions = {}
+        end
+    end
+})
+
+
+
+
+
+
+
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+Tabs.auto:AddButton({
+    Title = "Auto Item Farmer (5 Items)",
+    Description = "you need to stay in base and you could random die",
+    Callback = function()
+        local character = player.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        local root = character.HumanoidRootPart
+        local startPos = root.CFrame
+        
+        local collectedCount = 0
+        
+        task.spawn(function()
+            while collectedCount < 5 do
+                local itemsFolder = workspace:FindFirstChild("GameTriggers") and workspace.GameTriggers:FindFirstChild("Items")
+                local targetItem = nil
+                local prompt = nil
+                
+                if itemsFolder then
+                    for _, obj in ipairs(itemsFolder:GetDescendants()) do
+                        if obj:IsA("ProximityPrompt") then
+                            targetItem = obj.Parent
+                            prompt = obj
+                            break
+                        end
+                    end
+                end
+                
+                if targetItem and prompt then
+                    root.CFrame = targetItem.CFrame
+                    task.wait(0.2)
+                    
+                    fireproximityprompt(prompt)
+                    collectedCount = collectedCount + 1
+                    
+                    task.wait(0.2)
+                else
+                    break
+                end
+            end
+            
+            root.CFrame = startPos
+        end)
+    end
+})
+
+
+
+
